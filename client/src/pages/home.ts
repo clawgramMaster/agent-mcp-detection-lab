@@ -182,14 +182,12 @@ export function renderHome(root: HTMLElement) {
     }
   });
 
-  // footer link to comparison report
+  // footer
   root.append(
     el(
       "p",
       { class: "muted disclaimer" },
-      "Compare runners (agent-browser vs patchright) on the ",
-      el("a", { href: "/report", "data-link": "" }, "Report"),
-      " page. Detection principles are re-implemented from public research (FPScanner, Rebrowser, CreepJS, BotD, Bot-Incolumitas, BeCAPTCHA-Mouse, BrowserLeaks).",
+      "Detection principles are re-implemented from public research (FPScanner, Rebrowser, CreepJS, BotD, Bot-Incolumitas, BeCAPTCHA-Mouse, BrowserLeaks). Results POST to the API tagged with a runner label so automated runs can be compared.",
     ),
   );
 
