@@ -84,6 +84,7 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   scrollDynamics: 0.4,
   typingCadence: 0.5,
   keyboardDynamics: 0.5,
+  pasteVsType: 0.2, // pasting a password is legit human behavior — weak signal only
   clickTeleport: 0.5,
   headlessSignals: 0.5,
   iframeWorkerConsistency: 0.5,
@@ -92,7 +93,6 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   engineCoherence: 0.5,
   permissionsMismatch: 0.5,
   webglVendor: 0.5,
-  webgl2Params: 0.5,
   canvasRender: 0.4,
   domRect: 0.2,
   mediaCodecs: 0.5,
@@ -109,6 +109,7 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   batteryApi: 0.1,
   // informational (never contributes)
   fingerprint: 0,
+  webgl2Params: 0, // now emits only a params hash (verdict owned by webglVendor)
 };
 
 /**

@@ -17,7 +17,9 @@ export const exactCenterClick: Detector = {
   run: (ctx) => {
     const measured = ctx.clicks.filter((c) => c.centerDx !== undefined && c.centerDy !== undefined);
     if (measured.length === 0) {
-      return result("exactCenterClick", "warn", 15, { measuredClicks: 0 }, undefined, "interaction");
+      // No measurable click (e.g. submitted via Enter) — this decisive (weight 1.0)
+      // detector must stay neutral, not penalize legit keyboard-only users.
+      return result("exactCenterClick", "pass", 0, { measuredClicks: 0 }, undefined, "interaction");
     }
     let exact = 0;
     const hits: Array<{ dx: number; dy: number; w?: number; h?: number }> = [];
