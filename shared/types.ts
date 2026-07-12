@@ -76,6 +76,7 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   nativeToString: 0.9, // patched native fn = stealth automation, very hard tell
   exposeFunctionLeak: 0.9, // Puppeteer/Playwright binding on window — hard tell
   mainWorldExecution: 0.7, // Rebrowser main-world DOM-access trap (evadable)
+  electronDetection: 0.9, // Node/Electron surface on a web page — hard tell
   // strong — behavioral / structural signals
   suspiciousClientSideBehavior: 0.5,
   mouseEntropy: 0.5,
@@ -89,6 +90,7 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   iframeWorkerConsistency: 0.5,
   superhumanSubmit: 0.5,
   clientHints: 0.5,
+  engineCoherence: 0.5,
   permissionsMismatch: 0.5,
   webglVendor: 0.5,
   webgl2Params: 0.5,

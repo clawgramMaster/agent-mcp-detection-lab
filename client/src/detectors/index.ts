@@ -17,6 +17,8 @@ import { cdpRuntimeLeak, cdpStackTrace } from "./static/cdp";
 import { clientHints } from "./static/clientHints";
 import { cspBypass } from "./static/cspBypass";
 import { domRect } from "./static/domRect";
+import { electronDetection } from "./static/electron";
+import { engineCoherence } from "./static/engineCoherence";
 import { exposeFunctionLeak } from "./static/exposeFunctionLeak";
 import { fingerprint } from "./static/fingerprint";
 import { fonts } from "./static/fonts";
@@ -46,8 +48,10 @@ export const staticDetectors: Detector[] = [
   nativeToString,
   exposeFunctionLeak,
   mainWorldExecution,
+  electronDetection,
   // headless / environment tells
   headlessSignals,
+  engineCoherence,
   clientHints,
   screenAnomalies,
   speechVoices,
