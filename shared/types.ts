@@ -74,6 +74,8 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   exactCenterClick: 1,
   cspBypass: 0.9, // Rebrowser setBypassCSP — hard tell
   nativeToString: 0.9, // patched native fn = stealth automation, very hard tell
+  exposeFunctionLeak: 0.9, // Puppeteer/Playwright binding on window — hard tell
+  mainWorldExecution: 0.7, // Rebrowser main-world DOM-access trap (evadable)
   // strong — behavioral / structural signals
   suspiciousClientSideBehavior: 0.5,
   mouseEntropy: 0.5,
@@ -90,6 +92,8 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   permissionsMismatch: 0.5,
   webglVendor: 0.5,
   webgl2Params: 0.5,
+  canvasRender: 0.4,
+  domRect: 0.2,
   mediaCodecs: 0.5,
   pointerCapabilities: 0.4,
   localeTimezone: 0.3,
@@ -101,6 +105,7 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   audioFingerprint: 0.1,
   speechVoices: 0.1,
   webrtcLeak: 0.1,
+  batteryApi: 0.1,
   // informational (never contributes)
   fingerprint: 0,
 };

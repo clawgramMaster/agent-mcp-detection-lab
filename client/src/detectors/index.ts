@@ -11,14 +11,19 @@ import { suspiciousClientSideBehavior } from "./interaction/suspicious";
 import { pasteVsType, typingCadence } from "./interaction/typing";
 import { audioFingerprint } from "./static/audio";
 import { automationGlobals } from "./static/automationGlobals";
+import { batteryApi } from "./static/batteryApi";
+import { canvasRender } from "./static/canvasRender";
 import { cdpRuntimeLeak, cdpStackTrace } from "./static/cdp";
 import { clientHints } from "./static/clientHints";
 import { cspBypass } from "./static/cspBypass";
+import { domRect } from "./static/domRect";
+import { exposeFunctionLeak } from "./static/exposeFunctionLeak";
 import { fingerprint } from "./static/fingerprint";
 import { fonts } from "./static/fonts";
 import { headlessSignals } from "./static/headless";
 import { iframeWorkerConsistency } from "./static/iframeWorker";
 import { localeTimezone } from "./static/localeTimezone";
+import { mainWorldExecution } from "./static/mainWorldExecution";
 import { mediaCodecs } from "./static/mediaCodecs";
 import { nativeToString } from "./static/nativeToString";
 import { permissionsMismatch } from "./static/permissions";
@@ -39,6 +44,8 @@ export const staticDetectors: Detector[] = [
   cdpStackTrace,
   cspBypass,
   nativeToString,
+  exposeFunctionLeak,
+  mainWorldExecution,
   // headless / environment tells
   headlessSignals,
   clientHints,
@@ -47,10 +54,13 @@ export const staticDetectors: Detector[] = [
   mediaCodecs,
   pointerCapabilities,
   localeTimezone,
+  batteryApi,
   permissionsMismatch,
   // rendering / lies
   webglVendor,
   webgl2Params,
+  canvasRender,
+  domRect,
   prototypeLies,
   iframeWorkerConsistency,
   // fingerprint surfaces
