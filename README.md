@@ -24,8 +24,15 @@ Detection principles are re-implemented from public research
 - **`/static`** — page-load probes: `webdriver`, CDP `Runtime.enable` leak, injection
   stack artifacts, console timing, headless signals, WebGL software renderer,
   prototype tampering, iframe/worker consistency, permissions mismatch, fingerprint.
-- **`/interaction`** — login form probes: `isTrusted`, CDP synthetic mouse leak,
-  mouse-trajectory entropy, keystroke cadence, paste/value-injection, superhuman submit.
+- **`/interaction`** — login form probes: `isTrusted`, `shiftKeyConsistency`
+  (physically-impossible keystroke — the killer signal), `exactCenterClick`
+  (pixel-perfect centroid), CDP synthetic mouse leak, mouse-trajectory entropy,
+  click-teleport, keystroke cadence & dwell, paste/value-injection, superhuman submit.
+
+See **[`docs/behavioral-detection.md`](docs/behavioral-detection.md)** for the
+physical-constraint behavioral tells (exact-center click, mouse teleport, sparse
+trajectory, metronome typing, shifted-char-without-Shift) — discovered by breaking
+deviceandbrowserinfo.com with agent-browser, with evasion notes and measurements.
 - **`/report`** — per-test pass/warn/fail, raw JSON, `agent-browser` vs `patchright` diff,
   live SSE feed.
 

@@ -35,11 +35,19 @@ export interface MouseSample {
   movementX: number;
   movementY: number;
   isTrusted: boolean;
+  /** click only: offset from the clicked element's geometric center (px) */
+  centerDx?: number;
+  centerDy?: number;
+  /** click only: clicked element size (px) */
+  elW?: number;
+  elH?: number;
 }
 export interface KeySample {
   key: string;
   t: number;
   isTrusted: boolean;
+  /** whether the Shift modifier was held during this key event */
+  shift?: boolean;
 }
 
 /** Helper to build a TestResult with sensible defaults. */

@@ -94,15 +94,27 @@ export function renderHome(root: HTMLElement) {
     if (ctx.mouse.length > 2000) ctx.mouse.shift();
   };
   const onScroll = () => ctx.scrolls.push({ t: performance.now(), isTrusted: true });
-  const onClick = (e: MouseEvent) =>
-    ctx.clicks.push({
+  const onClick = (e: MouseEvent) => {
+    const s: MouseSample = {
       x: e.clientX,
       y: e.clientY,
       t: performance.now(),
       movementX: e.movementX,
       movementY: e.movementY,
       isTrusted: e.isTrusted,
-    } as MouseSample);
+    };
+    const tgt = e.target as Element | null;
+    if (tgt && typeof tgt.getBoundingClientRect === "function") {
+      const r = tgt.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) {
+        s.centerDx = e.clientX - (r.left + r.width / 2);
+        s.centerDy = e.clientY - (r.top + r.height / 2);
+        s.elW = r.width;
+        s.elH = r.height;
+      }
+    }
+    ctx.clicks.push(s);
+  };
   window.addEventListener("mousemove", onMove, { passive: true });
   window.addEventListener("scroll", onScroll, { passive: true });
   window.addEventListener("click", onClick, { passive: true });
@@ -121,9 +133,9 @@ export function renderHome(root: HTMLElement) {
     class: "field",
   }) as HTMLInputElement;
   const onKey = (e: KeyboardEvent) =>
-    ctx.keys.push({ key: e.key, t: performance.now(), isTrusted: e.isTrusted } as KeySample);
+    ctx.keys.push({ key: e.key, t: performance.now(), isTrusted: e.isTrusted, shift: e.shiftKey } as KeySample);
   const onKeyUp = (e: KeyboardEvent) =>
-    ctx.keyups.push({ key: e.key, t: performance.now(), isTrusted: e.isTrusted } as KeySample);
+    ctx.keyups.push({ key: e.key, t: performance.now(), isTrusted: e.isTrusted, shift: e.shiftKey } as KeySample);
   const onPaste = () => {
     ctx.pasted = true;
   };

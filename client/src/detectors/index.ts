@@ -1,8 +1,10 @@
 import type { Detector } from "../lib/detector";
 import { clickTeleport } from "./interaction/clickTeleport";
+import { exactCenterClick } from "./interaction/exactCenterClick";
 import { isTrusted, superhumanSubmit } from "./interaction/isTrusted";
 import { keyboardDynamics } from "./interaction/keyboardDynamics";
 import { cdpMouseLeak, mouseEntropy } from "./interaction/mouse";
+import { shiftKeyConsistency } from "./interaction/shiftKeyConsistency";
 import { suspiciousClientSideBehavior } from "./interaction/suspicious";
 import { pasteVsType, typingCadence } from "./interaction/typing";
 import { audioFingerprint } from "./static/audio";
@@ -48,6 +50,8 @@ export const staticDetectors: Detector[] = [
 export const interactionDetectors: Detector[] = [
   suspiciousClientSideBehavior,
   isTrusted,
+  shiftKeyConsistency, // KILLER: physically impossible keystroke
+  exactCenterClick, // hard physical tell: pixel-perfect centroid click
   cdpMouseLeak,
   mouseEntropy,
   clickTeleport,
