@@ -17,7 +17,16 @@ export function ratingBadge(r: Rating): HTMLElement {
 }
 
 export function verdictLabel(r: Rating): string {
-  return r === "pass" ? "🟢 Likely human" : r === "warn" ? "🟡 Suspicious" : "🔴 Likely bot";
+  return r === "pass" ? "Likely human" : r === "warn" ? "Suspicious" : "Likely bot";
+}
+
+/** Playful 5-band verdict stamp keyed to botScore (0 = human, 100 = bot). */
+export function scoreLabel(botScore: number): string {
+  if (botScore < 10) return "Certified Human";
+  if (botScore < 25) return "Suspiciously Human";
+  if (botScore < 50) return "Uncanny Valley";
+  if (botScore < 75) return "Smells Like a Script";
+  return "Straight-Up Bot";
 }
 
 /** A single test result row for the live list. */

@@ -2,7 +2,7 @@ import { type Rating, type TestResult, aggregate } from "../../../shared/types";
 import { interactionDetectors, staticDetectors } from "../detectors";
 import { currentRunner, submitResults } from "../lib/api";
 import { type DetectorCtx, type KeySample, type MouseSample, runDetectors } from "../lib/detector";
-import { el, resultRow, verdictLabel } from "../lib/ui";
+import { el, resultRow, scoreLabel } from "../lib/ui";
 
 export function renderHome(root: HTMLElement) {
   root.innerHTML = "";
@@ -20,8 +20,12 @@ export function renderHome(root: HTMLElement) {
     const { botScore, verdict } = aggregate(all);
     verdictNum.textContent = String(botScore);
     banner.className = `verdict-banner meter-${verdict}`;
-    const done = interactionResults.length > 0 ? "" : " (behavioral test pending — fill the form below)";
-    verdictText.textContent = `${verdictLabel(verdict)} · bot score ${botScore}/100${done}`;
+    const done = interactionResults.length > 0 ? "" : " · behavioral test pending — fill the form below";
+    verdictText.innerHTML = "";
+    verdictText.append(
+      el("span", { class: "verdict-tag" }, scoreLabel(botScore)),
+      ` · bot score ${botScore}/100${done}`,
+    );
     return verdict;
   }
 
