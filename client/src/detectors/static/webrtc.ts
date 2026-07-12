@@ -42,7 +42,7 @@ export const webrtcLeak: Detector = {
         const hasHost = candidates.some((c) => /typ host/.test(c));
         const ev = { candidateCount: candidates.length, hasHost, samples: candidates.slice(0, 3), ...extra };
         if (candidates.length === 0) {
-          resolve(result("webrtcLeak", "warn", 30, { ...ev, noCandidates: true }, undefined, "static"));
+          resolve(result("webrtcLeak", "warn", 20, { ...ev, noCandidates: true }, undefined, "static"));
         } else {
           resolve(result("webrtcLeak", "pass", 0, ev, undefined, "static"));
         }

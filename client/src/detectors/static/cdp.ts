@@ -35,9 +35,10 @@ export const cdpRuntimeLeak: Detector = {
 };
 
 /**
- * CDP sourceURL / stack shape probe.
- * Automation-injected scripts often surface unexpected frames or a
- * "__puppeteer_evaluation_script__" / eval sourceURL in stack traces.
+ * Injection stack-trace artifacts.
+ * Automation-injected scripts surface a puppeteer/playwright evaluation-script
+ * sourceURL in stack traces. Only definitive markers are used — generic "VM" /
+ * "<anonymous>" frames appear in normal eval and would false-positive.
  */
 export const cdpStackTrace: Detector = {
   test: "cdpStackTrace",
@@ -45,41 +46,9 @@ export const cdpStackTrace: Detector = {
   category: "static",
   run: () => {
     const stack = new Error().stack || "";
-    const markers = [
-      "__puppeteer_evaluation_script__",
-      "__playwright_evaluation_script__",
-      "VM", // eval'd VM scripts frequently indicate remote evaluate()
-      "evalmachine",
-      "<anonymous>:1",
-    ];
+    const markers = ["__puppeteer_evaluation_script__", "__playwright_evaluation_script__", "evalmachine"];
     const hit = markers.filter((m) => stack.includes(m));
-    // Presence of eval/anonymous injection markers is suspicious but noisy → warn.
-    if (hit.some((h) => h.includes("puppeteer") || h.includes("playwright") || h === "evalmachine")) {
-      return result("cdpStackTrace", "fail", 80, { hit }, undefined, "static");
-    }
-    if (hit.length) {
-      return result("cdpStackTrace", "warn", 25, { hit }, undefined, "static");
-    }
+    if (hit.length) return result("cdpStackTrace", "fail", 80, { hit }, undefined, "static");
     return result("cdpStackTrace", "pass", 0, {}, undefined, "static");
-  },
-};
-
-/**
- * console.debug timing probe — under an attached debugger/CDP session the
- * serialization of a large object into the protocol is measurably slower.
- */
-export const cdpConsoleTiming: Detector = {
-  test: "cdpConsoleTiming",
-  label: "console serialization timing",
-  category: "static",
-  run: () => {
-    const big: Record<string, number> = {};
-    for (let i = 0; i < 500; i++) big[`k${i}`] = i;
-    const t0 = performance.now();
-    for (let i = 0; i < 20; i++) console.debug(big);
-    const dt = performance.now() - t0;
-    // Heuristic threshold; heavy serialization to a CDP client is slower.
-    if (dt > 25) return result("cdpConsoleTiming", "warn", 30, { ms: +dt.toFixed(2) }, undefined, "static");
-    return result("cdpConsoleTiming", "pass", 0, { ms: +dt.toFixed(2) }, undefined, "static");
   },
 };

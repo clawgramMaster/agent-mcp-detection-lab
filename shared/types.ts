@@ -53,14 +53,26 @@ export interface SubmitBody {
   results: TestResult[];
 }
 
-/** Aggregate scoring helper shared by client + server. */
+/**
+ * Aggregate scoring shared by client + server.
+ *
+ * Design: bot detection is "any strong tell is enough" — a single definitive
+ * signal (e.g. shiftKeyConsistency=100) must dominate, and it must NOT be
+ * diluted by the many always-pass fingerprint/informational detectors. So the
+ * score is the strongest single signal plus a small bump per *additional*
+ * flagged signal (corroboration), rather than a mean.
+ *
+ *   botScore = min(100, maxScore + 6 * (flagged - 1))
+ *   flagged  = detectors scoring >= 25
+ *
+ * This keeps the number and the verdict consistent (one hard fail -> ~100 and
+ * "fail") while avoiding false "fail" from a couple of weak warns stacking.
+ */
 export function aggregate(results: TestResult[]): { botScore: number; verdict: Rating } {
   if (results.length === 0) return { botScore: 0, verdict: "pass" };
-  const totalScore = results.reduce((s, r) => s + r.score, 0);
-  const maxPer = 100;
-  const botScore = Math.min(100, Math.round((totalScore / (results.length * maxPer)) * 100 * 3)); // weighted
-  const hasFail = results.some((r) => r.rating === "fail");
-  const hasWarn = results.some((r) => r.rating === "warn");
-  const verdict: Rating = hasFail || botScore >= 50 ? "fail" : hasWarn || botScore >= 20 ? "warn" : "pass";
+  const maxScore = results.reduce((m, r) => Math.max(m, r.score), 0);
+  const flagged = results.filter((r) => r.score >= 25).length;
+  const botScore = Math.min(100, Math.round(maxScore + 6 * Math.max(0, flagged - 1)));
+  const verdict: Rating = botScore >= 50 ? "fail" : botScore >= 25 ? "warn" : "pass";
   return { botScore, verdict };
 }

@@ -9,7 +9,7 @@ import { suspiciousClientSideBehavior } from "./interaction/suspicious";
 import { pasteVsType, typingCadence } from "./interaction/typing";
 import { audioFingerprint } from "./static/audio";
 import { automationGlobals } from "./static/automationGlobals";
-import { cdpConsoleTiming, cdpRuntimeLeak, cdpStackTrace } from "./static/cdp";
+import { cdpRuntimeLeak, cdpStackTrace } from "./static/cdp";
 import { clientHints } from "./static/clientHints";
 import { fingerprint } from "./static/fingerprint";
 import { fonts } from "./static/fonts";
@@ -29,7 +29,6 @@ export const staticDetectors: Detector[] = [
   automationGlobals,
   cdpRuntimeLeak,
   cdpStackTrace,
-  cdpConsoleTiming,
   // headless / environment tells
   headlessSignals,
   clientHints,
