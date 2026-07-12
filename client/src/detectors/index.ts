@@ -4,6 +4,7 @@ import { exactCenterClick } from "./interaction/exactCenterClick";
 import { isTrusted, superhumanSubmit } from "./interaction/isTrusted";
 import { keyboardDynamics } from "./interaction/keyboardDynamics";
 import { cdpMouseLeak, mouseEntropy } from "./interaction/mouse";
+import { mouseKinematics } from "./interaction/mouseKinematics";
 import { shiftKeyConsistency } from "./interaction/shiftKeyConsistency";
 import { suspiciousClientSideBehavior } from "./interaction/suspicious";
 import { pasteVsType, typingCadence } from "./interaction/typing";
@@ -11,6 +12,7 @@ import { audioFingerprint } from "./static/audio";
 import { automationGlobals } from "./static/automationGlobals";
 import { cdpRuntimeLeak, cdpStackTrace } from "./static/cdp";
 import { clientHints } from "./static/clientHints";
+import { cspBypass } from "./static/cspBypass";
 import { fingerprint } from "./static/fingerprint";
 import { fonts } from "./static/fonts";
 import { headlessSignals } from "./static/headless";
@@ -29,6 +31,7 @@ export const staticDetectors: Detector[] = [
   automationGlobals,
   cdpRuntimeLeak,
   cdpStackTrace,
+  cspBypass,
   // headless / environment tells
   headlessSignals,
   clientHints,
@@ -53,6 +56,7 @@ export const interactionDetectors: Detector[] = [
   exactCenterClick, // hard physical tell: pixel-perfect centroid click
   cdpMouseLeak,
   mouseEntropy,
+  mouseKinematics,
   clickTeleport,
   typingCadence,
   keyboardDynamics,

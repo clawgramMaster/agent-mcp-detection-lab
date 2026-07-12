@@ -72,9 +72,11 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   shiftKeyConsistency: 1,
   cdpMouseLeak: 1,
   exactCenterClick: 1,
+  cspBypass: 0.9, // Rebrowser setBypassCSP — hard tell
   // strong — behavioral / structural signals
   suspiciousClientSideBehavior: 0.5,
   mouseEntropy: 0.5,
+  mouseKinematics: 0.5,
   typingCadence: 0.5,
   keyboardDynamics: 0.5,
   clickTeleport: 0.5,
