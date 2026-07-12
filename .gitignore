@@ -3,3 +3,6 @@ dist/
 data/*.json
 !data/.gitkeep
 *.log
+
+# local wrangler / D1 dev state
+.wrangler/

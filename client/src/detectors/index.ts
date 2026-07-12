@@ -18,6 +18,7 @@ import { fingerprint } from "./static/fingerprint";
 import { fonts } from "./static/fonts";
 import { headlessSignals } from "./static/headless";
 import { iframeWorkerConsistency } from "./static/iframeWorker";
+import { localeTimezone } from "./static/localeTimezone";
 import { mediaCodecs } from "./static/mediaCodecs";
 import { permissionsMismatch } from "./static/permissions";
 import { pointerCapabilities } from "./static/pointerCapabilities";
@@ -26,6 +27,7 @@ import { screenAnomalies } from "./static/screenAnomalies";
 import { speechVoices } from "./static/speechVoices";
 import { webdriver } from "./static/webdriver";
 import { webglVendor } from "./static/webgl";
+import { webgl2Params } from "./static/webgl2Params";
 import { webrtcLeak } from "./static/webrtc";
 
 export const staticDetectors: Detector[] = [
@@ -42,9 +44,11 @@ export const staticDetectors: Detector[] = [
   speechVoices,
   mediaCodecs,
   pointerCapabilities,
+  localeTimezone,
   permissionsMismatch,
   // rendering / lies
   webglVendor,
+  webgl2Params,
   prototypeLies,
   iframeWorkerConsistency,
   // fingerprint surfaces
