@@ -54,25 +54,28 @@ export interface SubmitBody {
 }
 
 /**
- * Aggregate scoring shared by client + server.
+ * Aggregate scoring shared by client + server — probabilistic OR (noisy-OR).
  *
- * Design: bot detection is "any strong tell is enough" — a single definitive
- * signal (e.g. shiftKeyConsistency=100) must dominate, and it must NOT be
- * diluted by the many always-pass fingerprint/informational detectors. So the
- * score is the strongest single signal plus a small bump per *additional*
- * flagged signal (corroboration), rather than a mean.
+ * Each detector's score is read as an independent "probability this is a bot"
+ * (score/100). We combine them as the chance that AT LEAST ONE is right:
  *
- *   botScore = min(100, maxScore + 6 * (flagged - 1))
- *   flagged  = detectors scoring >= 25
+ *   botScore = 100 * (1 - ∏(1 - scoreᵢ/100))
  *
- * This keeps the number and the verdict consistent (one hard fail -> ~100 and
- * "fail") while avoiding false "fail" from a couple of weak warns stacking.
+ * Properties:
+ *  - a single definitive tell (e.g. shiftKeyConsistency = 100) → 100 (dominates);
+ *  - multiple imperfect tells ACCUMULATE (e.g. 40 + 45 → 67, three 40s → 78) —
+ *    so "several things wrong" genuinely raises the score;
+ *  - it saturates toward 100 and can never exceed it (no 120);
+ *  - always-pass detectors (score 0) contribute nothing.
  */
 export function aggregate(results: TestResult[]): { botScore: number; verdict: Rating } {
   if (results.length === 0) return { botScore: 0, verdict: "pass" };
-  const maxScore = results.reduce((m, r) => Math.max(m, r.score), 0);
-  const flagged = results.filter((r) => r.score >= 25).length;
-  const botScore = Math.min(100, Math.round(maxScore + 6 * Math.max(0, flagged - 1)));
+  let survive = 1; // ∏ (1 - pᵢ) = probability every detector is "human"
+  for (const r of results) {
+    const p = Math.min(100, Math.max(0, r.score)) / 100;
+    survive *= 1 - p;
+  }
+  const botScore = Math.round(100 * (1 - survive));
   const verdict: Rating = botScore >= 50 ? "fail" : botScore >= 25 ? "warn" : "pass";
   return { botScore, verdict };
 }
