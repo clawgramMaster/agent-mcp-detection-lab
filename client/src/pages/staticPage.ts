@@ -25,6 +25,7 @@ export function renderStatic(root: HTMLElement) {
   const ctx: DetectorCtx = {
     mouse: [],
     keys: [],
+    keyups: [],
     scrolls: [],
     clicks: [],
     focusEvents: [],

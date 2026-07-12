@@ -14,6 +14,7 @@ export interface Detector {
 export interface DetectorCtx {
   mouse: MouseSample[];
   keys: KeySample[];
+  keyups: KeySample[];
   scrolls: EventSample[];
   clicks: MouseSample[];
   focusEvents: EventSample[];

@@ -10,6 +10,7 @@ export function renderInteraction(root: HTMLElement) {
   const ctx: DetectorCtx = {
     mouse: [],
     keys: [],
+    keyups: [],
     scrolls: [],
     clicks: [],
     focusEvents: [],
@@ -61,12 +62,16 @@ export function renderInteraction(root: HTMLElement) {
   const onKey = (e: KeyboardEvent) => {
     ctx.keys.push({ key: e.key, t: performance.now(), isTrusted: e.isTrusted } as KeySample);
   };
+  const onKeyUp = (e: KeyboardEvent) => {
+    ctx.keyups.push({ key: e.key, t: performance.now(), isTrusted: e.isTrusted } as KeySample);
+  };
   const onPaste = () => {
     ctx.pasted = true;
   };
   const onFocus = (e: FocusEvent) => ctx.focusEvents.push({ t: performance.now(), isTrusted: e.isTrusted });
   [user, pass].forEach((f) => {
     f.addEventListener("keydown", onKey);
+    f.addEventListener("keyup", onKeyUp);
     f.addEventListener("paste", onPaste);
     f.addEventListener("focus", onFocus);
   });

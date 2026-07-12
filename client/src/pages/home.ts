@@ -1,12 +1,7 @@
-import { aggregate, type Rating, type TestResult } from "../../../shared/types";
+import { type Rating, type TestResult, aggregate } from "../../../shared/types";
 import { interactionDetectors, staticDetectors } from "../detectors";
 import { currentRunner, submitResults } from "../lib/api";
-import {
-  type DetectorCtx,
-  type KeySample,
-  type MouseSample,
-  runDetectors,
-} from "../lib/detector";
+import { type DetectorCtx, type KeySample, type MouseSample, runDetectors } from "../lib/detector";
 import { el, resultRow, verdictLabel } from "../lib/ui";
 
 export function renderHome(root: HTMLElement) {
@@ -25,7 +20,7 @@ export function renderHome(root: HTMLElement) {
     const { botScore, verdict } = aggregate(all);
     verdictNum.textContent = String(botScore);
     banner.className = `verdict-banner meter-${verdict}`;
-    const done = interactionResults.length > 0 ? "" : " (행동 검사 전 — 아래 폼을 채워보세요)";
+    const done = interactionResults.length > 0 ? "" : " (behavioral test pending — fill the form below)";
     verdictText.textContent = `${verdictLabel(verdict)} · bot score ${botScore}/100${done}`;
     return verdict;
   }
@@ -34,11 +29,11 @@ export function renderHome(root: HTMLElement) {
     el(
       "div",
       { class: "home-hero" },
-      el("h1", {}, "이 브라우저는 봇인가?"),
+      el("h1", {}, "Is this browser a bot?"),
       el(
         "p",
         { class: "muted lead" },
-        "페이지에 들어오는 순간 자동으로 지문·CDP·자동화 흔적을 검사하고, 아래 로그인 폼에서 마우스·키보드 행동을 분석합니다. 사람이 직접 열면 초록, 자동화 봇(Playwright·Selenium·agent-browser 등)이 열면 빨강.",
+        "The moment you land, we scan for fingerprint, CDP and automation traces — then the login form below analyzes your mouse and keyboard behavior. A real human turns it green; an automation agent (Playwright, Selenium, agent-browser, …) turns it red.",
       ),
     ),
     banner,
@@ -46,21 +41,27 @@ export function renderHome(root: HTMLElement) {
 
   // ---------- Section 1: static (auto) ----------
   const staticList = el("div", { class: "result-list" });
-  const staticStatus = el("div", { class: "status" }, "페이지 진입 검사 실행 중…");
-  root.append(
-    section("① 자동 검사", "페이지를 여는 것만으로 실행 — 클릭 불필요", staticStatus, staticList),
-  );
+  const staticStatus = el("div", { class: "status" }, "Running page-load checks…");
+  root.append(section("① Passive checks", "Run just by opening the page — no clicks needed", staticStatus, staticList));
 
   const emptyCtx: DetectorCtx = {
-    mouse: [], keys: [], scrolls: [], clicks: [], focusEvents: [], formShownAt: 0, submittedAt: 0, pasted: false,
+    mouse: [],
+    keys: [],
+    keyups: [],
+    scrolls: [],
+    clicks: [],
+    focusEvents: [],
+    formShownAt: 0,
+    submittedAt: 0,
+    pasted: false,
   };
 
   runDetectors(staticDetectors, emptyCtx, (r) => staticList.append(resultRow(r))).then(async (results) => {
     staticResults = results;
     const failed = results.filter((r) => r.rating === "fail").length;
     staticStatus.textContent = failed
-      ? `자동 검사 완료 — ${failed}개 항목에서 봇 흔적 발견`
-      : "자동 검사 완료 — 정적 흔적 없음";
+      ? `Passive checks done — ${failed} test(s) flagged automation traces`
+      : "Passive checks done — no static traces found";
     refreshVerdict();
     try {
       await submitResults("static", results);
@@ -71,41 +72,89 @@ export function renderHome(root: HTMLElement) {
 
   // ---------- Section 2: interaction (login form) ----------
   const ctx: DetectorCtx = {
-    mouse: [], keys: [], scrolls: [], clicks: [], focusEvents: [], formShownAt: Date.now(), submittedAt: 0, pasted: false,
+    mouse: [],
+    keys: [],
+    keyups: [],
+    scrolls: [],
+    clicks: [],
+    focusEvents: [],
+    formShownAt: Date.now(),
+    submittedAt: 0,
+    pasted: false,
   };
   const onMove = (e: MouseEvent) => {
     ctx.mouse.push({
-      x: e.clientX, y: e.clientY, t: performance.now(), movementX: e.movementX, movementY: e.movementY, isTrusted: e.isTrusted,
+      x: e.clientX,
+      y: e.clientY,
+      t: performance.now(),
+      movementX: e.movementX,
+      movementY: e.movementY,
+      isTrusted: e.isTrusted,
     } as MouseSample);
     if (ctx.mouse.length > 2000) ctx.mouse.shift();
   };
   const onScroll = () => ctx.scrolls.push({ t: performance.now(), isTrusted: true });
   const onClick = (e: MouseEvent) =>
     ctx.clicks.push({
-      x: e.clientX, y: e.clientY, t: performance.now(), movementX: e.movementX, movementY: e.movementY, isTrusted: e.isTrusted,
+      x: e.clientX,
+      y: e.clientY,
+      t: performance.now(),
+      movementX: e.movementX,
+      movementY: e.movementY,
+      isTrusted: e.isTrusted,
     } as MouseSample);
   window.addEventListener("mousemove", onMove, { passive: true });
   window.addEventListener("scroll", onScroll, { passive: true });
   window.addEventListener("click", onClick, { passive: true });
 
   const form = el("form", { class: "login-form", autocomplete: "off" }) as HTMLFormElement;
-  const user = el("input", { type: "text", name: "username", placeholder: "아무 값이나 입력", class: "field" }) as HTMLInputElement;
-  const pass = el("input", { type: "password", name: "password", placeholder: "아무 값이나 입력", class: "field" }) as HTMLInputElement;
-  const onKey = (e: KeyboardEvent) => ctx.keys.push({ key: e.key, t: performance.now(), isTrusted: e.isTrusted } as KeySample);
-  const onPaste = () => { ctx.pasted = true; };
+  const user = el("input", {
+    type: "text",
+    name: "username",
+    placeholder: "type anything",
+    class: "field",
+  }) as HTMLInputElement;
+  const pass = el("input", {
+    type: "password",
+    name: "password",
+    placeholder: "type anything",
+    class: "field",
+  }) as HTMLInputElement;
+  const onKey = (e: KeyboardEvent) =>
+    ctx.keys.push({ key: e.key, t: performance.now(), isTrusted: e.isTrusted } as KeySample);
+  const onKeyUp = (e: KeyboardEvent) =>
+    ctx.keyups.push({ key: e.key, t: performance.now(), isTrusted: e.isTrusted } as KeySample);
+  const onPaste = () => {
+    ctx.pasted = true;
+  };
   const onFocus = (e: FocusEvent) => ctx.focusEvents.push({ t: performance.now(), isTrusted: e.isTrusted });
   for (const f of [user, pass]) {
     f.addEventListener("keydown", onKey);
+    f.addEventListener("keyup", onKeyUp);
     f.addEventListener("paste", onPaste);
     f.addEventListener("focus", onFocus);
   }
-  const submit = el("button", { type: "submit", class: "btn-primary" }, "로그인 (행동 검사 실행)") as HTMLButtonElement;
-  form.append(el("label", {}, "아이디", user), el("label", {}, "비밀번호", pass), submit);
+  const submit = el(
+    "button",
+    { type: "submit", class: "btn-primary" },
+    "Sign in (run behavioral test)",
+  ) as HTMLButtonElement;
+  form.append(el("label", {}, "Username", user), el("label", {}, "Password", pass), submit);
 
   const interList = el("div", { class: "result-list" });
-  const interStatus = el("div", { class: "status" }, "마우스를 움직이고 위 칸에 타이핑한 뒤 로그인을 누르세요.");
+  const interStatus = el(
+    "div",
+    { class: "status" },
+    "Move your mouse, type in the fields above, then sign in. The hardest signal to fake — stealth bots pass every static check but can't reproduce human motion.",
+  );
   root.append(
-    section("② 행동 검사", "실제 로그인처럼 마우스·타이핑 → 사람다운 행동인지 판정", form, interStatus, interList),
+    section(
+      "② Behavioral checks (the decisive one)",
+      "Mouse trajectory, keystroke rhythm & event trust — like a real login",
+      form,
+      interStatus,
+      interList,
+    ),
   );
 
   form.addEventListener("submit", async (e) => {
@@ -116,12 +165,16 @@ export function renderHome(root: HTMLElement) {
     window.removeEventListener("click", onClick);
     submit.disabled = true;
     interList.innerHTML = "";
-    interStatus.textContent = "행동 분석 중…";
+    interStatus.textContent = "Analyzing behavior…";
     const results = await runDetectors(interactionDetectors, ctx, (r) => interList.append(resultRow(r)));
     interactionResults = results;
     const v: Rating = refreshVerdict();
     interStatus.textContent =
-      v === "fail" ? "행동 검사 완료 — 봇으로 판정됨" : v === "warn" ? "행동 검사 완료 — 의심스러움" : "행동 검사 완료 — 사람으로 판정됨";
+      v === "fail"
+        ? "Behavioral test done — classified as BOT"
+        : v === "warn"
+          ? "Behavioral test done — suspicious"
+          : "Behavioral test done — classified as HUMAN";
     try {
       await submitResults("interaction", results);
     } catch {
@@ -134,9 +187,9 @@ export function renderHome(root: HTMLElement) {
     el(
       "p",
       { class: "muted disclaimer" },
-      "러너별(agent-browser vs patchright) 비교는 ",
+      "Compare runners (agent-browser vs patchright) on the ",
       el("a", { href: "/report", "data-link": "" }, "Report"),
-      " 페이지에서. 탐지 원리는 공개 연구(FPScanner·Rebrowser·CreepJS·BotD·BeCAPTCHA-Mouse) 자체 구현.",
+      " page. Detection principles are re-implemented from public research (FPScanner, Rebrowser, CreepJS, BotD, Bot-Incolumitas, BeCAPTCHA-Mouse, BrowserLeaks).",
     ),
   );
 
