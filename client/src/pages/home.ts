@@ -8,24 +8,43 @@ export function renderHome(root: HTMLElement) {
   root.innerHTML = "";
 
   let staticResults: TestResult[] = [];
-  let interactionResults: TestResult[] = [];
 
-  // ---------- top verdict banner ----------
-  const verdictNum = el("div", { class: "verdict-num" }, "…");
-  const verdictText = el("div", { class: "verdict-text muted" }, "Running checks…");
-  const banner = el("div", { class: "verdict-banner meter-warn" }, verdictNum, el("div", {}, verdictText));
+  // ---------- two-part verdict banner: Passive (static) + Behavioral (interaction) ----------
+  const sNum = el("div", { class: "verdict-num" }, "…");
+  const sLabel = el("div", { class: "verdict-tag" }, "scanning…");
+  const sCard = el(
+    "div",
+    { class: "vcard meter-warn" },
+    sNum,
+    el("div", {}, el("div", { class: "verdict-sub" }, "Passive · fingerprint"), sLabel),
+  );
+  const bNum = el("div", { class: "verdict-num" }, "—");
+  const bLabel = el("div", { class: "verdict-tag" }, "interact to measure…");
+  const bCard = el(
+    "div",
+    { class: "vcard" },
+    bNum,
+    el("div", {}, el("div", { class: "verdict-sub" }, "Behavioral · human motion"), bLabel),
+  );
+  const banner = el("div", { class: "verdict-banner" }, sCard, bCard);
 
-  function refreshVerdict() {
-    const all = [...staticResults, ...interactionResults];
-    const { botScore, verdict } = aggregate(all);
-    verdictNum.textContent = String(botScore);
-    banner.className = `verdict-banner meter-${verdict}`;
-    const done = interactionResults.length > 0 ? "" : " · behavioral test pending — fill the form below";
-    verdictText.innerHTML = "";
-    verdictText.append(
-      el("span", { class: "verdict-tag" }, scoreLabel(botScore)),
-      ` · bot score ${botScore}/100${done}`,
-    );
+  function setStatic() {
+    const { botScore, verdict } = aggregate(staticResults);
+    sNum.textContent = String(botScore);
+    sCard.className = `vcard meter-${verdict}`;
+    sLabel.textContent = `${botScore}/100 · ${scoreLabel(botScore)}`;
+  }
+  function setBehavioral(results: TestResult[] | null) {
+    if (!results || results.length === 0) {
+      bNum.textContent = "—";
+      bCard.className = "vcard";
+      bLabel.textContent = "interact to measure…";
+      return "pass" as Rating;
+    }
+    const { botScore, verdict } = aggregate(results);
+    bNum.textContent = String(botScore);
+    bCard.className = `vcard meter-${verdict}`;
+    bLabel.textContent = `${botScore}/100 · ${scoreLabel(botScore)}`;
     return verdict;
   }
 
@@ -70,7 +89,7 @@ export function renderHome(root: HTMLElement) {
     staticStatus.textContent = failed
       ? `Passive checks done — ${failed} test(s) flagged automation traces`
       : "Passive checks done — no static traces found";
-    refreshVerdict();
+    setStatic();
     try {
       await submitResults("static", staticResults);
     } catch {
@@ -171,19 +190,17 @@ export function renderHome(root: HTMLElement) {
     { class: "status" },
     "Move your mouse, type in the fields above, then sign in. The hardest signal to fake — stealth bots pass every static check but can't reproduce human motion.",
   );
-  const liveMeter = el("div", { class: "live-meter" }, "live behavior — interact to measure…");
   root.append(
     section(
       "② Behavioral checks (the decisive one)",
       "Mouse trajectory, keystroke rhythm & event trust — like a real login",
       form,
-      liveMeter,
       interStatus,
       interList,
     ),
   );
 
-  // live behavioral read-out that updates as the user moves / types (pre-submit)
+  // live: the Behavioral card in the banner updates as the user moves / types
   const liveTimer = window.setInterval(() => {
     if (ctx.mouse.length + ctx.keys.length + ctx.clicks.length === 0) return;
     const live: TestResult[] = [];
@@ -195,9 +212,7 @@ export function renderHome(root: HTMLElement) {
         /* skip */
       }
     }
-    const { botScore, verdict } = aggregate(live);
-    liveMeter.className = `live-meter meter-${verdict}`;
-    liveMeter.textContent = `live behavior · ${botScore}/100 — ${scoreLabel(botScore)}`;
+    setBehavioral(live);
   }, 600);
 
   form.addEventListener("submit", async (e) => {
@@ -212,8 +227,7 @@ export function renderHome(root: HTMLElement) {
     interList.innerHTML = "";
     interStatus.textContent = "Analyzing behavior…";
     const results = await runDetectors(interactionDetectors, ctx, (r) => interList.append(resultRow(r)));
-    interactionResults = results;
-    const v: Rating = refreshVerdict();
+    const v: Rating = setBehavioral(results);
     interStatus.textContent =
       v === "fail"
         ? "Behavioral test done — classified as BOT"
@@ -236,7 +250,7 @@ export function renderHome(root: HTMLElement) {
     ),
   );
 
-  refreshVerdict();
+  setBehavioral(null);
 }
 
 function section(title: string, sub: string, ...body: (Node | string)[]): HTMLElement {

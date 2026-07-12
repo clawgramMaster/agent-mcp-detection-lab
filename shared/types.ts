@@ -88,6 +88,8 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   clientHints: 0.5,
   permissionsMismatch: 0.5,
   webglVendor: 0.5,
+  mediaCodecs: 0.5,
+  pointerCapabilities: 0.4,
   httpHeaders: 0.5, // server-side header consistency
   tlsClient: 0.1, // server-side TLS fingerprint (weak without Bot Management)
   // weak / noisy — suggestive only, tiny penalty even when wrong

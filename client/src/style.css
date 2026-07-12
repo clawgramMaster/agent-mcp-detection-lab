@@ -153,74 +153,81 @@ h3 {
   font-size: 16px;
 }
 
-/* verdict banner — the dark focal card (otium hero block) */
+/* verdict banner — two dark stat cards: Passive + Behavioral */
 .verdict-banner {
   display: flex;
-  align-items: center;
-  gap: 24px;
   background: var(--dark);
   color: var(--cream);
   border-radius: var(--radius-lg);
-  padding: 30px 34px;
   margin: 22px 0 10px;
-  border-left: 6px solid var(--warn);
   box-shadow: 0 10px 30px rgba(20, 18, 15, 0.12);
+  overflow: hidden;
 }
-.verdict-banner.meter-pass {
-  border-left-color: var(--pass);
+.vcard {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 26px 28px;
+  border-left: 5px solid rgba(207, 201, 189, 0.18);
 }
-.verdict-banner.meter-warn {
-  border-left-color: var(--warn);
+.vcard:first-child {
+  border-left: none;
 }
-.verdict-banner.meter-fail {
-  border-left-color: var(--fail);
+.vcard.meter-pass {
+  box-shadow: inset 4px 0 0 var(--pass);
+}
+.vcard.meter-warn {
+  box-shadow: inset 4px 0 0 var(--warn);
+}
+.vcard.meter-fail {
+  box-shadow: inset 4px 0 0 var(--fail);
 }
 .verdict-num {
   font-family: var(--mono);
-  font-size: 60px;
+  font-size: 48px;
   font-weight: 500;
   line-height: 1;
   letter-spacing: -0.04em;
-  min-width: 90px;
+  min-width: 64px;
+  color: #cfc9bd;
+}
+.vcard.meter-pass .verdict-num {
+  color: #7fd4a0;
+}
+.vcard.meter-warn .verdict-num {
+  color: #e6c069;
+}
+.vcard.meter-fail .verdict-num {
+  color: #ef8f8f;
+}
+.verdict-sub {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #928c80;
+  margin-bottom: 3px;
 }
 .verdict-text {
   font-size: 15px;
   color: #cfc9bd;
 }
+@media (max-width: 620px) {
+  .verdict-banner {
+    flex-direction: column;
+  }
+  .vcard {
+    border-left: none;
+  }
+  .vcard + .vcard {
+    border-top: 1px solid rgba(207, 201, 189, 0.15);
+  }
+}
 .verdict-tag {
-  font-weight: 700;
-  font-size: 17px;
+  font-weight: 600;
+  font-size: 14px;
   color: var(--cream);
   letter-spacing: -0.01em;
-}
-
-/* live behavioral meter */
-.live-meter {
-  display: inline-block;
-  margin: 4px 0 12px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--line-strong);
-  background: var(--surface);
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--muted);
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
-}
-.live-meter.meter-pass {
-  background: var(--pass-bg);
-  color: var(--pass);
-  border-color: var(--pass-bg);
-}
-.live-meter.meter-warn {
-  background: var(--warn-bg);
-  color: var(--warn);
-  border-color: var(--warn-bg);
-}
-.live-meter.meter-fail {
-  background: var(--fail-bg);
-  color: var(--fail);
-  border-color: var(--fail-bg);
 }
 
 /* sections */

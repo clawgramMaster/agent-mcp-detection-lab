@@ -18,7 +18,9 @@ import { fingerprint } from "./static/fingerprint";
 import { fonts } from "./static/fonts";
 import { headlessSignals } from "./static/headless";
 import { iframeWorkerConsistency } from "./static/iframeWorker";
+import { mediaCodecs } from "./static/mediaCodecs";
 import { permissionsMismatch } from "./static/permissions";
+import { pointerCapabilities } from "./static/pointerCapabilities";
 import { prototypeLies } from "./static/prototypeLies";
 import { screenAnomalies } from "./static/screenAnomalies";
 import { speechVoices } from "./static/speechVoices";
@@ -38,6 +40,8 @@ export const staticDetectors: Detector[] = [
   clientHints,
   screenAnomalies,
   speechVoices,
+  mediaCodecs,
+  pointerCapabilities,
   permissionsMismatch,
   // rendering / lies
   webglVendor,
