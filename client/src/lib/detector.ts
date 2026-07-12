@@ -27,6 +27,54 @@ export interface DetectorCtx {
   honeypotReasons?: string[];
   /** per-step reaction latency (ms) from instruction shown → action performed */
   stepLatencies?: number[];
+  /** multi-step grid challenge telemetry */
+  grid?: GridState;
+  /** slider-drag task telemetry */
+  slider?: SliderState;
+  /** "click when it turns green" delayed-button task telemetry */
+  delayed?: DelayedState;
+}
+
+export interface SliderState {
+  target: number;
+  value: number;
+  /** value samples recorded during dragging */
+  samples: { v: number; t: number; trusted: boolean }[];
+  startedAt: number;
+  releasedAt: number;
+  completed: boolean;
+}
+
+export interface DelayedState {
+  /** when the button became enabled (turned green) */
+  enabledAt: number;
+  /** when it was actually clicked */
+  clickedAt: number;
+  clickedBeforeEnable: boolean;
+  trusted: boolean;
+}
+
+export interface GridClick {
+  tile: number;
+  t: number;
+  /** click offset from the tile's exact pixel center */
+  dxCenter: number;
+  dyCenter: number;
+  /** mousemove samples observed since the previous grid click */
+  movesSincePrev: number;
+  /** cursor path length (px) travelled since the previous grid click */
+  pathLenSincePrev: number;
+  /** straight-line distance (px) between previous and current tile centers */
+  tileGap: number;
+  isTrusted: boolean;
+}
+
+export interface GridState {
+  targetOrder: number[];
+  shownAt: number;
+  clicks: GridClick[];
+  completed: boolean;
+  correct: boolean;
 }
 
 export interface EventSample {

@@ -49,8 +49,13 @@ export function renderHome(root: HTMLElement) {
     else staticList.append(row);
     staticRows.set(r.test, row);
     setStatic();
+    const all = [...staticMap.values()];
+    const failed = all.filter((x) => x.rating === "fail").length;
+    staticSummary.textContent = failed
+      ? `${failed} of ${all.length} passive checks flagged — show details`
+      : `Show all ${all.length} passive checks`;
     if (r.rating === "fail") {
-      const failed = [...staticMap.values()].filter((x) => x.rating === "fail").length;
+      staticDetails.open = true; // surface the evidence when something trips
       staticStatus.textContent = `Passive checks — ${failed} test(s) flagged automation traces`;
     }
   }
@@ -85,7 +90,13 @@ export function renderHome(root: HTMLElement) {
   // ---------- Section 1: static (auto) ----------
   const staticList = el("div", { class: "result-list" });
   const staticStatus = el("div", { class: "status" }, "Running page-load checks…");
-  root.append(section("① Passive checks", "Run just by opening the page — no clicks needed", staticStatus, staticList));
+  // Collapse the long list of passive checks behind a summary; auto-expands when
+  // a check flags automation so the evidence is visible.
+  const staticSummary = el("summary", { class: "list-summary" }, "Show all passive checks");
+  const staticDetails = el("details", { class: "list-details" }, staticSummary, staticList) as HTMLDetailsElement;
+  root.append(
+    section("① Passive checks", "Run just by opening the page — no clicks needed", staticStatus, staticDetails),
+  );
 
   const emptyCtx: DetectorCtx = {
     mouse: [],
@@ -194,6 +205,137 @@ export function renderHome(root: HTMLElement) {
   window.addEventListener("wheel", onWheel, { passive: true });
   window.addEventListener("click", onClick, { passive: true });
 
+  // ---- Step 1: multi-step grid challenge ----
+  const TILE_LABELS = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
+  const order: number[] = [];
+  while (order.length < 3) {
+    const n = Math.floor(Math.random() * TILE_LABELS.length);
+    if (!order.includes(n)) order.push(n);
+  }
+  ctx.grid = { targetOrder: order, shownAt: Date.now(), clicks: [], completed: false, correct: false };
+
+  let lastMouseIdx = 0;
+  let lastCenter: { x: number; y: number } | null = null;
+  let expectIdx = 0;
+
+  const gridStatus = el(
+    "div",
+    { class: "status" },
+    `Step 1 — click the tiles in this order:  ${order.map((i) => TILE_LABELS[i]).join("  →  ")}`,
+  );
+  const gridEl = el("div", { class: "tile-grid" });
+  for (let i = 0; i < TILE_LABELS.length; i++) {
+    const tile = el("button", { type: "button", class: "tile", "data-i": String(i) }, TILE_LABELS[i]) as HTMLButtonElement;
+    tile.addEventListener("click", (e: MouseEvent) => {
+      logFirstAction();
+      const r = tile.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      let pathLen = 0;
+      for (let k = Math.max(1, lastMouseIdx); k < ctx.mouse.length; k++) {
+        pathLen += Math.hypot(ctx.mouse[k].x - ctx.mouse[k - 1].x, ctx.mouse[k].y - ctx.mouse[k - 1].y);
+      }
+      const g = ctx.grid;
+      if (!g) return;
+      g.clicks.push({
+        tile: i,
+        t: performance.now(),
+        dxCenter: e.clientX - cx,
+        dyCenter: e.clientY - cy,
+        movesSincePrev: ctx.mouse.length - lastMouseIdx,
+        pathLenSincePrev: pathLen,
+        tileGap: lastCenter ? Math.hypot(cx - lastCenter.x, cy - lastCenter.y) : 0,
+        isTrusted: e.isTrusted,
+      });
+      lastMouseIdx = ctx.mouse.length;
+      lastCenter = { x: cx, y: cy };
+      if (i === order[expectIdx]) {
+        expectIdx++;
+        tile.classList.add("tile-ok");
+      } else {
+        tile.classList.add("tile-bad");
+      }
+      if (expectIdx >= order.length) {
+        g.completed = true;
+        g.correct = true;
+        gridStatus.textContent = "Step 1 done — continue to Step 2.";
+      }
+    });
+    gridEl.append(tile);
+  }
+
+  // ---- Step 2: slider drag to a target ----
+  const sliderTarget = 60 + Math.floor(Math.random() * 25); // 60–84
+  ctx.slider = { target: sliderTarget, value: 0, samples: [], startedAt: 0, releasedAt: 0, completed: false };
+  const sliderStatus = el("div", { class: "status" }, `Step 2 — drag the slider to exactly ${sliderTarget}.`);
+  const sliderInput = el("input", {
+    type: "range",
+    min: "0",
+    max: "100",
+    value: "0",
+    class: "slider",
+  }) as HTMLInputElement;
+  const sliderVal = el("span", { class: "slider-val" }, "0");
+  const onSliderStart = (e: Event) => {
+    const s = ctx.slider;
+    if (s && s.startedAt === 0) s.startedAt = performance.now();
+    void e;
+  };
+  const onSliderInput = (e: Event) => {
+    const s = ctx.slider;
+    if (!s) return;
+    if (s.startedAt === 0) s.startedAt = performance.now();
+    const v = Number((e.target as HTMLInputElement).value);
+    s.value = v;
+    s.samples.push({ v, t: performance.now(), trusted: e.isTrusted });
+    sliderVal.textContent = String(v);
+    if (v === s.target) {
+      s.completed = true;
+      s.releasedAt = performance.now();
+      sliderStatus.textContent = `Step 2 done — hit ${s.target}.`;
+      sliderInput.classList.add("slider-ok");
+    }
+  };
+  const onSliderRelease = () => {
+    const s = ctx.slider;
+    if (s && s.releasedAt === 0 && s.samples.length) s.releasedAt = performance.now();
+  };
+  sliderInput.addEventListener("pointerdown", onSliderStart);
+  sliderInput.addEventListener("input", onSliderInput);
+  sliderInput.addEventListener("pointerup", onSliderRelease);
+  sliderInput.addEventListener("change", onSliderRelease);
+  const sliderRow = el("div", { class: "slider-row" }, sliderInput, sliderVal);
+
+  // ---- Step 3: click the button once it turns green ----
+  ctx.delayed = { enabledAt: 0, clickedAt: 0, clickedBeforeEnable: true, trusted: false };
+  const delayedStatus = el("div", { class: "status" }, "Step 3 — click Continue when it turns green (wait for it).");
+  const delayedBtn = el(
+    "button",
+    { type: "button", class: "btn-secondary delayed", disabled: "true" },
+    "Continue (wait…)",
+  ) as HTMLButtonElement;
+  window.setTimeout(
+    () => {
+      const d = ctx.delayed;
+      if (d) d.enabledAt = performance.now();
+      delayedBtn.disabled = false;
+      delayedBtn.textContent = "Continue";
+      delayedBtn.classList.add("delayed-ready");
+    },
+    1500 + Math.floor(Math.random() * 1500),
+  );
+  delayedBtn.addEventListener("click", (e: MouseEvent) => {
+    logFirstAction();
+    const d = ctx.delayed;
+    if (!d) return;
+    d.clickedAt = performance.now();
+    d.trusted = e.isTrusted;
+    d.clickedBeforeEnable = d.enabledAt === 0;
+    delayedBtn.classList.add("delayed-done");
+    delayedBtn.textContent = "Continued";
+    delayedStatus.textContent = "Step 3 recorded.";
+  });
+
   const form = el("form", { class: "login-form", autocomplete: "off" }) as HTMLFormElement;
   const user = el("input", {
     type: "text",
@@ -265,6 +407,13 @@ export function renderHome(root: HTMLElement) {
     section(
       "② Active challenge (the decisive one)",
       "Complete the task — we judge how it's done, not whether it's done",
+      gridStatus,
+      gridEl,
+      sliderStatus,
+      sliderRow,
+      delayedStatus,
+      delayedBtn,
+      el("label", { class: "step2-label" }, "Step 4 — type anything, then Verify"),
       form,
       interStatus,
       interList,

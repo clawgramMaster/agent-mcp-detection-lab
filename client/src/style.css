@@ -602,3 +602,117 @@ label {
   height: 1px;
   opacity: 0;
 }
+
+/* Multi-step grid challenge */
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  max-width: 320px;
+  margin: 12px 0 20px;
+}
+.tile {
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--line, #d9d3c7);
+  border-radius: 10px;
+  background: #fbf9f4;
+  color: #1b1915;
+  font: 600 20px/1 "JetBrains Mono", monospace;
+  cursor: pointer;
+  transition: transform 0.08s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.tile:hover {
+  border-color: #1b1915;
+  transform: translateY(-1px);
+}
+.tile-ok {
+  background: #e7f5ec;
+  border-color: #7fd4a0;
+  color: #2f7d52;
+}
+.tile-bad {
+  background: #fbeaea;
+  border-color: #ef8f8f;
+}
+.step2-label {
+  display: block;
+  font-size: 13px;
+  color: #6b655a;
+  margin-bottom: 6px;
+}
+
+/* Slider drag task */
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 340px;
+  margin: 8px 0 20px;
+}
+.slider {
+  flex: 1;
+  accent-color: #1b1915;
+}
+.slider-ok {
+  accent-color: #2f7d52;
+}
+.slider-val {
+  font: 600 15px/1 "JetBrains Mono", monospace;
+  min-width: 2.5ch;
+  text-align: right;
+}
+/* Delayed button task */
+.btn-secondary.delayed {
+  margin: 4px 0 20px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1px solid #d9d3c7;
+  background: #eeeae1;
+  color: #9a9488;
+  cursor: not-allowed;
+  font-size: 14px;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.btn-secondary.delayed-ready {
+  background: #e7f5ec;
+  border-color: #7fd4a0;
+  color: #2f7d52;
+  cursor: pointer;
+}
+.btn-secondary.delayed-done {
+  background: #1b1915;
+  color: #f3f0ea;
+  border-color: #1b1915;
+}
+
+/* Collapsible passive-check list */
+.list-details {
+  border: 1px solid #e4dfd4;
+  border-radius: 10px;
+  background: #fbf9f4;
+}
+.list-summary {
+  cursor: pointer;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b655a;
+  list-style: none;
+  user-select: none;
+}
+.list-summary::-webkit-details-marker {
+  display: none;
+}
+.list-summary::before {
+  content: "▸ ";
+  color: #9a9488;
+}
+.list-details[open] .list-summary::before {
+  content: "▾ ";
+}
+.list-details[open] .list-summary {
+  border-bottom: 1px solid #e4dfd4;
+}
+.list-details .result-list {
+  padding: 6px;
+}

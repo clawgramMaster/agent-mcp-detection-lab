@@ -1,6 +1,8 @@
 import type { Detector } from "../lib/detector";
 import { clickTeleport } from "./interaction/clickTeleport";
+import { delayedButton } from "./interaction/delayedButton";
 import { exactCenterClick } from "./interaction/exactCenterClick";
+import { gridChallenge } from "./interaction/gridChallenge";
 import { honeypot, reactionLatency } from "./interaction/honeypot";
 import { isTrusted, superhumanSubmit } from "./interaction/isTrusted";
 import { keyboardDynamics } from "./interaction/keyboardDynamics";
@@ -8,6 +10,7 @@ import { cdpMouseLeak, mouseEntropy } from "./interaction/mouse";
 import { mouseKinematics } from "./interaction/mouseKinematics";
 import { scrollDynamics } from "./interaction/scrollDynamics";
 import { shiftKeyConsistency } from "./interaction/shiftKeyConsistency";
+import { sliderDrag } from "./interaction/sliderDrag";
 import { suspiciousClientSideBehavior } from "./interaction/suspicious";
 import { pasteVsType, typingCadence } from "./interaction/typing";
 import { audioFingerprint } from "./static/audio";
@@ -75,6 +78,9 @@ export const staticDetectors: Detector[] = [
 
 export const interactionDetectors: Detector[] = [
   honeypot, // decisive: touched a human-invisible control
+  gridChallenge, // motion between ordered tile clicks
+  sliderDrag, // drag kinematics to a target
+  delayedButton, // react to a visual state change
   reactionLatency, // superhuman instruction→action latency
   suspiciousClientSideBehavior,
   isTrusted,

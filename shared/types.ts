@@ -73,6 +73,9 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   cdpMouseLeak: 1,
   exactCenterClick: 1,
   honeypot: 1, // touched a control invisible to humans — decisive
+  gridChallenge: 0.6, // teleport/dead-center/superhuman motion between ordered clicks
+  sliderDrag: 0.6, // drag kinematics: jump / linear ramp / superhuman
+  delayedButton: 0.7, // clicked before enabled or superhuman reaction to visual change
   reactionLatency: 0.5, // superhuman instruction→action timing
   cspBypass: 0.9, // Rebrowser setBypassCSP — hard tell
   nativeToString: 0.9, // patched native fn = stealth automation, very hard tell
