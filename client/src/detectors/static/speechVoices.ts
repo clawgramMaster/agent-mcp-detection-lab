@@ -3,7 +3,9 @@ import { type Detector, result } from "../../lib/detector";
 /**
  * Speech synthesis voices (headless tell).
  * Real desktop browsers ship a non-empty list of TTS voices. Headless Chrome
- * and many automation containers expose ZERO voices — a strong, cheap signal.
+ * and many automation containers expose ZERO voices. Suggestive, not proof —
+ * real browsers can also briefly report 0 (async TTS load, some Linux setups),
+ * so an empty list is a "warn", not a solo "fail".
  */
 export const speechVoices: Detector = {
   test: "speechVoices",
@@ -21,7 +23,7 @@ export const speechVoices: Detector = {
           const voices = synth.getVoices();
           const ev = { count: voices.length, sample: voices.slice(0, 3).map((v) => `${v.name} (${v.lang})`) };
           if (voices.length === 0) {
-            resolve(result("speechVoices", "fail", 60, { ...ev, empty: true }, undefined, "static"));
+            resolve(result("speechVoices", "warn", 40, { ...ev, empty: true }, undefined, "static"));
           } else {
             resolve(result("speechVoices", "pass", 0, ev, undefined, "static"));
           }
