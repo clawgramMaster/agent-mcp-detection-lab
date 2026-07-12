@@ -1,13 +1,17 @@
 import { type Rating, type TestResult, aggregate } from "../../../shared/types";
 import { interactionDetectors, staticDetectors } from "../detectors";
 import { currentRunner, fetchInspect, submitResults } from "../lib/api";
+import { startCdpMonitor } from "../lib/cdpMonitor";
 import { type DetectorCtx, type KeySample, type MouseSample, runDetectors } from "../lib/detector";
 import { el, resultRow, scoreLabel } from "../lib/ui";
 
 export function renderHome(root: HTMLElement) {
   root.innerHTML = "";
 
-  let staticResults: TestResult[] = [];
+  // Static results are keyed by test id with worst-ever semantics, so the
+  // temporal CDP monitor can upgrade a row (green→red) when an agent acts.
+  const staticMap = new Map<string, TestResult>();
+  const staticRows = new Map<string, HTMLElement>();
 
   // ---------- two-part verdict banner: Passive (static) + Behavioral (interaction) ----------
   const sNum = el("div", { class: "verdict-num" }, "…");
@@ -29,10 +33,26 @@ export function renderHome(root: HTMLElement) {
   const banner = el("div", { class: "verdict-banner" }, sCard, bCard);
 
   function setStatic() {
-    const { botScore, verdict } = aggregate(staticResults);
+    const { botScore, verdict } = aggregate([...staticMap.values()]);
     sNum.textContent = String(botScore);
     sCard.className = `vcard meter-${verdict}`;
     sLabel.textContent = `${botScore}/100 · ${scoreLabel(botScore)}`;
+  }
+  // Insert or upgrade a static result row (worst-ever wins), then refresh score.
+  function upsertStatic(r: TestResult) {
+    const prev = staticMap.get(r.test);
+    if (prev && prev.score >= r.score) return; // never downgrade a raised flag
+    staticMap.set(r.test, r);
+    const row = resultRow(r);
+    const existing = staticRows.get(r.test);
+    if (existing) existing.replaceWith(row);
+    else staticList.append(row);
+    staticRows.set(r.test, row);
+    setStatic();
+    if (r.rating === "fail") {
+      const failed = [...staticMap.values()].filter((x) => x.rating === "fail").length;
+      staticStatus.textContent = `Passive checks — ${failed} test(s) flagged automation traces`;
+    }
   }
   function setBehavioral(results: TestResult[] | null) {
     if (!results || results.length === 0) {
@@ -80,21 +100,30 @@ export function renderHome(root: HTMLElement) {
     pasted: false,
   };
 
-  runDetectors(staticDetectors, emptyCtx, (r) => staticList.append(resultRow(r))).then(async (results) => {
+  runDetectors(staticDetectors, emptyCtx, (r) => upsertStatic(r)).then(async () => {
     // merge server-side header/TLS inspection (signals JS can't see)
     const serverResults = await fetchInspect();
-    for (const r of serverResults) staticList.append(resultRow(r));
-    staticResults = [...results, ...serverResults];
-    const failed = staticResults.filter((r) => r.rating === "fail").length;
+    for (const r of serverResults) upsertStatic(r);
+    const failed = [...staticMap.values()].filter((r) => r.rating === "fail").length;
     staticStatus.textContent = failed
       ? `Passive checks done — ${failed} test(s) flagged automation traces`
-      : "Passive checks done — no static traces found";
+      : "Passive checks done — no static traces found (still monitoring for CDP activity…)";
     setStatic();
     try {
-      await submitResults("static", staticResults);
+      await submitResults("static", [...staticMap.values()]);
     } catch {
       /* offline ok */
     }
+    // Keep watching: an agent that calls evaluate/console/snapshot AFTER load
+    // enables CDP domains only then — the monitor flips the Passive score live.
+    startCdpMonitor((r) => {
+      const before = staticMap.get(r.test)?.score ?? -1;
+      upsertStatic(r);
+      const after = staticMap.get(r.test)?.score ?? -1;
+      if (r.rating === "fail" && after > before) {
+        void submitResults("static", [...staticMap.values()]).catch(() => {});
+      }
+    });
   });
 
   // ---------- Section 2: interaction (login form) ----------
