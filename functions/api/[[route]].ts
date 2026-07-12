@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { handle } from "hono/cloudflare-pages";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
-import { type NetworkFingerprint, type Session, type SubmitBody, aggregate } from "../../shared/types";
+import { type NetworkFingerprint, type Session, type SubmitBody, type TestResult, aggregate } from "../../shared/types";
 
 type Bindings = { DB: D1Database };
 
@@ -11,6 +11,78 @@ const app = new Hono<{ Bindings: Bindings }>().basePath("/api");
 app.use("*", cors());
 
 app.get("/health", (c) => c.json({ ok: true, service: "agentmcplab", ts: Date.now() }));
+
+/**
+ * GET /api/inspect — server-side signals the client JS can't see:
+ * HTTP request headers (Accept-Language, Sec-Fetch-*, Sec-CH-UA, headless UA)
+ * and Cloudflare-derived TLS/network fingerprint. Returned as TestResult[] so
+ * the client merges them into the passive-check list and the bot score.
+ */
+app.get("/inspect", (c) => {
+  const now = Date.now();
+  const h = (name: string) => c.req.header(name);
+  const ua = h("user-agent") || "";
+  const out: TestResult[] = [];
+
+  // --- HTTP header consistency (headers a real browser always sends) ---
+  const hev: Record<string, unknown> = {};
+  let hscore = 0;
+  if (/HeadlessChrome/i.test(ua)) {
+    hev.headlessUA = true;
+    hscore += 90;
+  }
+  if (!h("accept-language")) {
+    hev.noAcceptLanguage = true;
+    hscore += 35;
+  }
+  if (!h("sec-fetch-mode") && !h("sec-fetch-site")) {
+    hev.noSecFetch = true;
+    hscore += 25;
+  }
+  const isChrome = /Chrome\/\d+/.test(ua) && !/Edg\/|OPR\//.test(ua);
+  if (isChrome && !h("sec-ch-ua")) {
+    hev.noSecChUa = true;
+    hscore += 30;
+  }
+  const accept = h("accept") || "";
+  if (!accept || accept === "*/*") {
+    hev.wildcardAccept = true;
+    hscore += 15;
+  }
+  hev.ua = ua;
+  hscore = Math.min(100, hscore);
+  out.push({
+    test: "httpHeaders",
+    label: "HTTP request headers (server)",
+    category: "network",
+    rating: hscore >= 60 ? "fail" : hscore >= 25 ? "warn" : "pass",
+    score: hscore,
+    evidence: hev,
+    timestamp: now,
+  });
+
+  // --- TLS / network fingerprint (Cloudflare request.cf) ---
+  const net = readNetwork(c.req.raw);
+  let tscore = 0;
+  const tev: Record<string, unknown> = { ...net };
+  if (net.tlsVersion && /TLSv1\.0|TLSv1\.1/i.test(net.tlsVersion)) {
+    tev.oldTls = true;
+    tscore += 30;
+  }
+  if (net.ja3Hash) tev.hasJa3 = true; // present only with Bot Management (paid)
+  tscore = Math.min(100, tscore);
+  out.push({
+    test: "tlsClient",
+    label: "TLS / network fingerprint (server)",
+    category: "network",
+    rating: tscore >= 60 ? "fail" : tscore >= 25 ? "warn" : "pass",
+    score: tscore,
+    evidence: tev,
+    timestamp: now,
+  });
+
+  return c.json(out);
+});
 
 /** Extract Cloudflare-provided network fingerprint from request.cf */
 function readNetwork(req: Request): NetworkFingerprint {

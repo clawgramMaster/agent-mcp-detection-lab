@@ -1,6 +1,6 @@
 import { type Rating, type TestResult, aggregate } from "../../../shared/types";
 import { interactionDetectors, staticDetectors } from "../detectors";
-import { currentRunner, submitResults } from "../lib/api";
+import { currentRunner, fetchInspect, submitResults } from "../lib/api";
 import { type DetectorCtx, type KeySample, type MouseSample, runDetectors } from "../lib/detector";
 import { el, resultRow, scoreLabel } from "../lib/ui";
 
@@ -61,14 +61,17 @@ export function renderHome(root: HTMLElement) {
   };
 
   runDetectors(staticDetectors, emptyCtx, (r) => staticList.append(resultRow(r))).then(async (results) => {
-    staticResults = results;
-    const failed = results.filter((r) => r.rating === "fail").length;
+    // merge server-side header/TLS inspection (signals JS can't see)
+    const serverResults = await fetchInspect();
+    for (const r of serverResults) staticList.append(resultRow(r));
+    staticResults = [...results, ...serverResults];
+    const failed = staticResults.filter((r) => r.rating === "fail").length;
     staticStatus.textContent = failed
       ? `Passive checks done — ${failed} test(s) flagged automation traces`
       : "Passive checks done — no static traces found";
     refreshVerdict();
     try {
-      await submitResults("static", results);
+      await submitResults("static", staticResults);
     } catch {
       /* offline ok */
     }

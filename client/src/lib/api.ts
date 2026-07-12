@@ -1,5 +1,16 @@
 import type { Session, SubmitBody, TestResult } from "../../../shared/types";
 
+/** Server-side header/TLS inspection (signals the browser JS can't see). */
+export async function fetchInspect(): Promise<TestResult[]> {
+  try {
+    const res = await fetch("/api/inspect");
+    if (!res.ok) return [];
+    return (await res.json()) as TestResult[];
+  } catch {
+    return [];
+  }
+}
+
 const RUNNER_KEY = "agentmcplab.runner";
 
 /** The runner label lets the bench harness tag its submissions (?runner=). */
