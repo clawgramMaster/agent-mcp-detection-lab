@@ -41,10 +41,14 @@ export const screenAnomalies: Detector = {
       ev.lowColorDepth = true;
       score += 20;
     }
-    // Classic headless default viewport.
+    // Automation default viewports (Rebrowser): Puppeteer 800x600, Playwright 1280x720.
     if (width === 800 && height === 600) {
       ev.default800x600 = true;
       score += 40;
+    }
+    if (innerWidth === 1280 && innerHeight === 720) {
+      ev.playwrightViewport = true;
+      score += 30;
     }
     if (width === 0 || height === 0) {
       ev.zeroScreen = true;
