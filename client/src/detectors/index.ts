@@ -30,7 +30,6 @@ import { mediaCodecs } from "./static/mediaCodecs";
 import { nativeToString } from "./static/nativeToString";
 import { permissionsMismatch } from "./static/permissions";
 import { pointerCapabilities } from "./static/pointerCapabilities";
-import { prototypeLies } from "./static/prototypeLies";
 import { screenAnomalies } from "./static/screenAnomalies";
 import { speechVoices } from "./static/speechVoices";
 import { webdriver } from "./static/webdriver";
@@ -65,7 +64,6 @@ export const staticDetectors: Detector[] = [
   webgl2Params,
   canvasRender,
   domRect,
-  prototypeLies,
   iframeWorkerConsistency,
   // fingerprint surfaces
   fingerprint,

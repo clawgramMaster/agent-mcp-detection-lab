@@ -2,10 +2,13 @@ import { type Detector, result } from "../../lib/detector";
 
 /**
  * WebGL2 deep parameters (CreepJS / BrowserLeaks).
- * Modern Chrome/Firefox ship WebGL2. Headless or GPU-disabled automation often
- * either lacks a WebGL2 context or falls back to a software renderer
- * (SwiftShader / llvmpipe / Mesa). Also emits a params+extensions hash as a
+ * Modern Chrome/Firefox ship WebGL2. Headless/GPU-disabled automation often
+ * lacks a WebGL2 context entirely. Also emits a params+extensions hash as a
  * stable fingerprint surface.
+ *
+ * NOTE: software-renderer detection (SwiftShader/llvmpipe/Mesa) is intentionally
+ * NOT done here — `webglVendor` owns that verdict; duplicating it would double-
+ * count the same GPU string under the weighted noisy-OR.
  */
 function hash(s: string): string {
   let h = 0x811c9dc5;
@@ -46,12 +49,8 @@ export const webgl2Params: Detector = {
         gl.getParameter(gl.MAX_VERTEX_UNIFORM_BLOCKS),
         gl.getSupportedExtensions()?.join(","),
       ];
+      // vendor/renderer kept as fingerprint evidence only — verdict is webglVendor's job.
       const ev: Record<string, unknown> = { vendor, renderer, paramsHash: hash(params.join("|")) };
-
-      const soft = /SwiftShader|llvmpipe|software|Mesa OffScreen|Google Inc\. \(Google\)/i;
-      if (soft.test(String(vendor)) || soft.test(String(renderer))) {
-        return result("webgl2Params", "fail", 65, { ...ev, software: true }, undefined, "static");
-      }
       return result("webgl2Params", "pass", 0, ev, undefined, "static");
     } catch (e) {
       return result("webgl2Params", "warn", 10, { error: String(e) }, undefined, "static");

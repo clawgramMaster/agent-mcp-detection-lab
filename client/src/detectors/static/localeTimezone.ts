@@ -28,11 +28,8 @@ export const localeTimezone: Detector = {
         ev.utcTimezone = true;
         score += 20;
       }
-      // empty / missing language list
-      if (!lang || langs.length === 0) {
-        ev.noLanguage = true;
-        score += 30;
-      }
+      // NOTE: empty navigator.languages is intentionally NOT scored here —
+      // `headlessSignals` owns that tell (avoids double-counting under noisy-OR).
       // IANA timezone vs actual runtime offset sanity: resolve the offset the
       // timezone should have and compare with Date's real offset.
       try {

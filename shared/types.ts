@@ -85,7 +85,6 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   typingCadence: 0.5,
   keyboardDynamics: 0.5,
   clickTeleport: 0.5,
-  prototypeLies: 0.5,
   headlessSignals: 0.5,
   iframeWorkerConsistency: 0.5,
   superhumanSubmit: 0.5,

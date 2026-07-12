@@ -9,10 +9,12 @@ import { type Detector, result } from "../../lib/detector";
  * wrapper that references the framework's delivery internals
  * (deliverResult / deliverError / __playwright__binding__ / bindingName …).
  * A genuine browser has no such wrappers on window.
+ *
+ * SCOPE: this detector only inspects the *source* of window functions for binding
+ * wrappers. Window property *names* that look like automation (__playwright,
+ * __pwInitScripts, selenium, cdc_ …) are owned by `automationGlobals` — scanning
+ * names here too would double-count the same evidence under the weighted noisy-OR.
  */
-// Names are matched against automation-specific tokens only (avoid flagging a
-// site's own `dataBinding` etc).
-const BINDING_NAME_RE = /^(__playwright|__pw|__pptr|__puppeteer|puppeteerLeak|playwright)/i;
 // Body markers that appear ONLY in framework binding wrappers — deliberately not
 // generic Promise/callback patterns, which legit page code also contains.
 const WRAPPER_SRC_RE = /deliverResult|deliverError|__playwright__binding__|__puppeteer_|bindingName|_playwrightBinding/;
@@ -40,24 +42,13 @@ export const exposeFunctionLeak: Detector = {
       }
       if (typeof val !== "function") continue;
 
-      // 1) name looks like an automation binding
-      const nameHit = BINDING_NAME_RE.test(name);
-
-      // 2) a non-native function on window whose body reveals a binding wrapper
-      let srcHit = false;
+      // A non-native function on window whose body reveals a binding wrapper.
       try {
         const src = fnToString.call(val);
-        if (!/\{\s*\[native code\]\s*\}/.test(src) && WRAPPER_SRC_RE.test(src)) srcHit = true;
+        if (!/\{\s*\[native code\]\s*\}/.test(src) && WRAPPER_SRC_RE.test(src)) hits.push(name);
       } catch {
         /* */
       }
-
-      if (nameHit || srcHit) hits.push(name);
-    }
-
-    // Playwright also stashes bindings under these exact keys.
-    for (const k of ["__playwright__binding__", "__pwInitScripts", "__playwright_binding_call"]) {
-      if (k in window && !hits.includes(k)) hits.push(k);
     }
 
     if (hits.length) {
