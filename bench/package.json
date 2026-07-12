@@ -1,0 +1,14 @@
+{
+  "name": "@agentmcplab/bench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP bench runner: drive the lab with agent-browser and patchright, then diff.",
+  "scripts": {
+    "bench": "node --experimental-strip-types runner.ts",
+    "bench:node": "tsx runner.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.1"
+  }
+}
