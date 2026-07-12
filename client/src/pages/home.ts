@@ -53,6 +53,7 @@ export function renderHome(root: HTMLElement) {
     keys: [],
     keyups: [],
     scrolls: [],
+    wheels: [],
     clicks: [],
     focusEvents: [],
     formShownAt: 0,
@@ -83,6 +84,7 @@ export function renderHome(root: HTMLElement) {
     keys: [],
     keyups: [],
     scrolls: [],
+    wheels: [],
     clicks: [],
     focusEvents: [],
     formShownAt: Date.now(),
@@ -101,6 +103,8 @@ export function renderHome(root: HTMLElement) {
     if (ctx.mouse.length > 2000) ctx.mouse.shift();
   };
   const onScroll = () => ctx.scrolls.push({ t: performance.now(), isTrusted: true });
+  const onWheel = (e: WheelEvent) =>
+    ctx.wheels.push({ t: performance.now(), deltaY: e.deltaY, isTrusted: e.isTrusted });
   const onClick = (e: MouseEvent) => {
     const s: MouseSample = {
       x: e.clientX,
@@ -124,6 +128,7 @@ export function renderHome(root: HTMLElement) {
   };
   window.addEventListener("mousemove", onMove, { passive: true });
   window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("wheel", onWheel, { passive: true });
   window.addEventListener("click", onClick, { passive: true });
 
   const form = el("form", { class: "login-form", autocomplete: "off" }) as HTMLFormElement;
@@ -181,6 +186,7 @@ export function renderHome(root: HTMLElement) {
     ctx.submittedAt = Date.now();
     window.removeEventListener("mousemove", onMove);
     window.removeEventListener("scroll", onScroll);
+    window.removeEventListener("wheel", onWheel);
     window.removeEventListener("click", onClick);
     submit.disabled = true;
     interList.innerHTML = "";

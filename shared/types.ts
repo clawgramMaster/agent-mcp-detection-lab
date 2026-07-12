@@ -77,6 +77,7 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   suspiciousClientSideBehavior: 0.5,
   mouseEntropy: 0.5,
   mouseKinematics: 0.5,
+  scrollDynamics: 0.4,
   typingCadence: 0.5,
   keyboardDynamics: 0.5,
   clickTeleport: 0.5,

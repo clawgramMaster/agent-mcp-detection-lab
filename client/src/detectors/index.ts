@@ -5,6 +5,7 @@ import { isTrusted, superhumanSubmit } from "./interaction/isTrusted";
 import { keyboardDynamics } from "./interaction/keyboardDynamics";
 import { cdpMouseLeak, mouseEntropy } from "./interaction/mouse";
 import { mouseKinematics } from "./interaction/mouseKinematics";
+import { scrollDynamics } from "./interaction/scrollDynamics";
 import { shiftKeyConsistency } from "./interaction/shiftKeyConsistency";
 import { suspiciousClientSideBehavior } from "./interaction/suspicious";
 import { pasteVsType, typingCadence } from "./interaction/typing";
@@ -58,6 +59,7 @@ export const interactionDetectors: Detector[] = [
   mouseEntropy,
   mouseKinematics,
   clickTeleport,
+  scrollDynamics,
   typingCadence,
   keyboardDynamics,
   pasteVsType,

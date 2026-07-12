@@ -16,6 +16,7 @@ export interface DetectorCtx {
   keys: KeySample[];
   keyups: KeySample[];
   scrolls: EventSample[];
+  wheels: WheelSample[];
   clicks: MouseSample[];
   focusEvents: EventSample[];
   formShownAt: number;
@@ -25,6 +26,12 @@ export interface DetectorCtx {
 
 export interface EventSample {
   t: number;
+  isTrusted: boolean;
+}
+
+export interface WheelSample {
+  t: number;
+  deltaY: number;
   isTrusted: boolean;
 }
 
