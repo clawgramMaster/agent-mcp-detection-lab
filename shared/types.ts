@@ -72,6 +72,8 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   shiftKeyConsistency: 1,
   cdpMouseLeak: 1,
   exactCenterClick: 1,
+  honeypot: 1, // touched a control invisible to humans — decisive
+  reactionLatency: 0.5, // superhuman instruction→action timing
   cspBypass: 0.9, // Rebrowser setBypassCSP — hard tell
   nativeToString: 0.9, // patched native fn = stealth automation, very hard tell
   exposeFunctionLeak: 0.9, // Puppeteer/Playwright binding on window — hard tell

@@ -1,6 +1,7 @@
 import type { Detector } from "../lib/detector";
 import { clickTeleport } from "./interaction/clickTeleport";
 import { exactCenterClick } from "./interaction/exactCenterClick";
+import { honeypot, reactionLatency } from "./interaction/honeypot";
 import { isTrusted, superhumanSubmit } from "./interaction/isTrusted";
 import { keyboardDynamics } from "./interaction/keyboardDynamics";
 import { cdpMouseLeak, mouseEntropy } from "./interaction/mouse";
@@ -73,6 +74,8 @@ export const staticDetectors: Detector[] = [
 ];
 
 export const interactionDetectors: Detector[] = [
+  honeypot, // decisive: touched a human-invisible control
+  reactionLatency, // superhuman instruction→action latency
   suspiciousClientSideBehavior,
   isTrusted,
   shiftKeyConsistency, // KILLER: physically impossible keystroke

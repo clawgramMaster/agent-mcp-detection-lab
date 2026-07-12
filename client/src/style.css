@@ -590,3 +590,15 @@ label {
     display: none;
   }
 }
+
+/* Honeypot traps — present in the DOM & programmatically reachable, but
+   positioned off-screen and out of tab order so no sighted human can touch
+   them. Any interaction is therefore an automated agent parsing the page. */
+.hp-trap {
+  position: absolute !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}

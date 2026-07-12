@@ -22,6 +22,11 @@ export interface DetectorCtx {
   formShownAt: number;
   submittedAt: number;
   pasted: boolean;
+  /** honeypot: agent touched a control/field invisible to real humans */
+  honeypotTriggered?: boolean;
+  honeypotReasons?: string[];
+  /** per-step reaction latency (ms) from instruction shown → action performed */
+  stepLatencies?: number[];
 }
 
 export interface EventSample {
