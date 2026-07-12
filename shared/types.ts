@@ -73,6 +73,7 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   cdpMouseLeak: 1,
   exactCenterClick: 1,
   cspBypass: 0.9, // Rebrowser setBypassCSP — hard tell
+  nativeToString: 0.9, // patched native fn = stealth automation, very hard tell
   // strong — behavioral / structural signals
   suspiciousClientSideBehavior: 0.5,
   mouseEntropy: 0.5,

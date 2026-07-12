@@ -20,6 +20,7 @@ import { headlessSignals } from "./static/headless";
 import { iframeWorkerConsistency } from "./static/iframeWorker";
 import { localeTimezone } from "./static/localeTimezone";
 import { mediaCodecs } from "./static/mediaCodecs";
+import { nativeToString } from "./static/nativeToString";
 import { permissionsMismatch } from "./static/permissions";
 import { pointerCapabilities } from "./static/pointerCapabilities";
 import { prototypeLies } from "./static/prototypeLies";
@@ -37,6 +38,7 @@ export const staticDetectors: Detector[] = [
   cdpRuntimeLeak,
   cdpStackTrace,
   cspBypass,
+  nativeToString,
   // headless / environment tells
   headlessSignals,
   clientHints,
