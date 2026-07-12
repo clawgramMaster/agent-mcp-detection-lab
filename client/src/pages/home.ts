@@ -171,15 +171,34 @@ export function renderHome(root: HTMLElement) {
     { class: "status" },
     "Move your mouse, type in the fields above, then sign in. The hardest signal to fake — stealth bots pass every static check but can't reproduce human motion.",
   );
+  const liveMeter = el("div", { class: "live-meter" }, "live behavior — interact to measure…");
   root.append(
     section(
       "② Behavioral checks (the decisive one)",
       "Mouse trajectory, keystroke rhythm & event trust — like a real login",
       form,
+      liveMeter,
       interStatus,
       interList,
     ),
   );
+
+  // live behavioral read-out that updates as the user moves / types (pre-submit)
+  const liveTimer = window.setInterval(() => {
+    if (ctx.mouse.length + ctx.keys.length + ctx.clicks.length === 0) return;
+    const live: TestResult[] = [];
+    for (const d of interactionDetectors) {
+      try {
+        const r = d.run(ctx);
+        if (!(r instanceof Promise)) live.push(r);
+      } catch {
+        /* skip */
+      }
+    }
+    const { botScore, verdict } = aggregate(live);
+    liveMeter.className = `live-meter meter-${verdict}`;
+    liveMeter.textContent = `live behavior · ${botScore}/100 — ${scoreLabel(botScore)}`;
+  }, 600);
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -188,6 +207,7 @@ export function renderHome(root: HTMLElement) {
     window.removeEventListener("scroll", onScroll);
     window.removeEventListener("wheel", onWheel);
     window.removeEventListener("click", onClick);
+    window.clearInterval(liveTimer);
     submit.disabled = true;
     interList.innerHTML = "";
     interStatus.textContent = "Analyzing behavior…";
