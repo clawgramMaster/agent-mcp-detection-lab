@@ -47,7 +47,7 @@ export const shiftKeyConsistency: Detector = {
     const impossible = shiftedChars.filter((k) => {
       if (k.shift !== false) return false; // Shift was held → fine
       if (k.altGraph === true) return false; // AltGr composition (non-US layouts)
-      if ((k.key >= "A" && k.key <= "Z") && k.caps === true) return false; // CapsLock uppercase
+      if (k.key >= "A" && k.key <= "Z" && k.caps === true) return false; // CapsLock uppercase
       return true;
     });
     const ev = {

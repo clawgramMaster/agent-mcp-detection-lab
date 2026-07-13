@@ -117,6 +117,18 @@ export function renderHome(root: HTMLElement) {
     pasted: false,
   };
 
+  // Start the temporal CDP monitor IMMEDIATELY — not after the sequential scan —
+  // so CDP domains an agent enables during page load are caught right away. It
+  // upserts into the same test ids (worst-ever), so it composes with the scan.
+  startCdpMonitor((r) => {
+    const before = staticMap.get(r.test)?.score ?? -1;
+    upsertStatic(r);
+    const after = staticMap.get(r.test)?.score ?? -1;
+    if (r.rating === "fail" && after > before) {
+      void submitResults("static", [...staticMap.values()]).catch(() => {});
+    }
+  });
+
   runDetectors(staticDetectors, emptyCtx, (r) => upsertStatic(r)).then(async () => {
     // merge server-side header/TLS inspection (signals JS can't see)
     const serverResults = await fetchInspect();
@@ -131,16 +143,6 @@ export function renderHome(root: HTMLElement) {
     } catch {
       /* offline ok */
     }
-    // Keep watching: an agent that calls evaluate/console/snapshot AFTER load
-    // enables CDP domains only then — the monitor flips the Passive score live.
-    startCdpMonitor((r) => {
-      const before = staticMap.get(r.test)?.score ?? -1;
-      upsertStatic(r);
-      const after = staticMap.get(r.test)?.score ?? -1;
-      if (r.rating === "fail" && after > before) {
-        void submitResults("static", [...staticMap.values()]).catch(() => {});
-      }
-    });
   });
 
   // ---------- Section 2: interaction (login form) ----------
@@ -222,7 +224,11 @@ export function renderHome(root: HTMLElement) {
   );
   const gridEl = el("div", { class: "tile-grid" });
   for (let i = 0; i < TILE_LABELS.length; i++) {
-    const tile = el("button", { type: "button", class: "tile", "data-i": String(i) }, TILE_LABELS[i]) as HTMLButtonElement;
+    const tile = el(
+      "button",
+      { type: "button", class: "tile", "data-i": String(i) },
+      TILE_LABELS[i],
+    ) as HTMLButtonElement;
     tile.addEventListener("click", (e: MouseEvent) => {
       const r = tile.getBoundingClientRect();
       const cx = r.left + r.width / 2;
@@ -396,18 +402,8 @@ export function renderHome(root: HTMLElement) {
   ) as HTMLButtonElement;
   hpButton.addEventListener("click", () => triggerHoneypot("clicked hidden honeypot button"));
 
-  const submit = el(
-    "button",
-    { type: "submit", class: "btn-primary" },
-    "Verify me",
-  ) as HTMLButtonElement;
-  form.append(
-    el("label", {}, "Username", user),
-    el("label", {}, "Password", pass),
-    hpField,
-    hpButton,
-    submit,
-  );
+  const submit = el("button", { type: "submit", class: "btn-primary" }, "Verify me") as HTMLButtonElement;
+  form.append(el("label", {}, "Username", user), el("label", {}, "Password", pass), hpField, hpButton, submit);
 
   const interList = el("div", { class: "result-list" });
   const interStatus = el(

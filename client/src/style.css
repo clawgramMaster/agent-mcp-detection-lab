@@ -617,7 +617,7 @@ label {
   border-radius: 10px;
   background: #fbf9f4;
   color: #1b1915;
-  font: 600 20px/1 "JetBrains Mono", monospace;
+  font: 600 20px / 1 "JetBrains Mono", monospace;
   cursor: pointer;
   transition: transform 0.08s ease, border-color 0.15s ease, background 0.15s ease;
 }
@@ -657,7 +657,7 @@ label {
   accent-color: #2f7d52;
 }
 .slider-val {
-  font: 600 15px/1 "JetBrains Mono", monospace;
+  font: 600 15px / 1 "JetBrains Mono", monospace;
   min-width: 2.5ch;
   text-align: right;
 }

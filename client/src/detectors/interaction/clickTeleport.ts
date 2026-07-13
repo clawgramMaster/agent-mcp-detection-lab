@@ -12,7 +12,14 @@ export const clickTeleport: Detector = {
   category: "interaction",
   run: (ctx) => {
     if (ctx.clicks.length === 0) {
-      return result("clickTeleport", "inconclusive", 0, { clicks: 0, note: "no clicks captured" }, undefined, "interaction");
+      return result(
+        "clickTeleport",
+        "inconclusive",
+        0,
+        { clicks: 0, note: "no clicks captured" },
+        undefined,
+        "interaction",
+      );
     }
     let teleports = 0;
     for (const c of ctx.clicks) {

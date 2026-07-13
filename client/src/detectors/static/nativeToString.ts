@@ -43,7 +43,10 @@ export const nativeToString: Detector = {
       ["HTMLCanvasElement.toDataURL", HTMLCanvasElement.prototype.toDataURL],
       ["navigator.mediaDevices.enumerateDevices", navigator.mediaDevices?.enumerateDevices],
       ["navigator.plugins.item", navigator.plugins?.item],
-      ["Notification.requestPermission", (window as { Notification?: { requestPermission?: unknown } }).Notification?.requestPermission],
+      [
+        "Notification.requestPermission",
+        (window as { Notification?: { requestPermission?: unknown } }).Notification?.requestPermission,
+      ],
       ["Object.getOwnPropertyDescriptor", Object.getOwnPropertyDescriptor],
       [
         "WebGLRenderingContext.getParameter",

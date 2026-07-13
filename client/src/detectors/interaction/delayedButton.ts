@@ -30,7 +30,8 @@ export const delayedButton: Detector = {
     } else {
       const reaction = d.clickedAt - d.enabledAt;
       ev.reactionMs = Math.round(reaction);
-      if (reaction < 150) score += 70; // faster than human perception+motor
+      if (reaction < 150)
+        score += 70; // faster than human perception+motor
       else if (reaction < 280) score += 30;
     }
     if (!d.trusted) {

@@ -46,7 +46,12 @@ export const batteryApi: Detector = {
         score += 40;
       }
       // Headless default: charging true, level 1, both times Infinity/0.
-      if (b.charging === true && b.level === 1 && b.chargingTime === 0 && b.dischargingTime === Number.POSITIVE_INFINITY) {
+      if (
+        b.charging === true &&
+        b.level === 1 &&
+        b.chargingTime === 0 &&
+        b.dischargingTime === Number.POSITIVE_INFINITY
+      ) {
         ev.defaultFullCharged = true;
         score += 15; // very common on real plugged-in desktops too → weak
       }

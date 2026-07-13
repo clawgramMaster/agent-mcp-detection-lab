@@ -155,11 +155,10 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   canvasRender: 0.4,
   pointerCapabilities: 0.4,
   superhumanSubmit: 0.4,
-  mainWorldExecution: 0.4, // trap; evadable, kept low pending real-runner validation
+  mainWorldExecution: 0, // experimental trap — informational until validated vs real runners
   pasteVsType: 0.2, // pasting a password is legit human behavior
   tlsClient: 0.1, // weak without Bot Management
   // --- informational only (never contribute to the score) ---
-  suspiciousClientSideBehavior: 0, // duplicate meta-detector — superseded by grouped signals
   fingerprint: 0,
   webgl2Params: 0,
   domRect: 0,

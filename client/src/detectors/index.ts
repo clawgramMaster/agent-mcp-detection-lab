@@ -11,7 +11,6 @@ import { mouseKinematics } from "./interaction/mouseKinematics";
 import { scrollDynamics } from "./interaction/scrollDynamics";
 import { shiftKeyConsistency } from "./interaction/shiftKeyConsistency";
 import { sliderDrag } from "./interaction/sliderDrag";
-import { suspiciousClientSideBehavior } from "./interaction/suspicious";
 import { pasteVsType, typingCadence } from "./interaction/typing";
 import { audioFingerprint } from "./static/audio";
 import { automationGlobals } from "./static/automationGlobals";
@@ -81,7 +80,6 @@ export const interactionDetectors: Detector[] = [
   gridChallenge, // motion between ordered tile clicks
   sliderDrag, // drag kinematics to a target
   delayedButton, // react to a visual state change
-  suspiciousClientSideBehavior,
   isTrusted,
   shiftKeyConsistency, // KILLER: physically impossible keystroke
   exactCenterClick, // hard physical tell: pixel-perfect centroid click

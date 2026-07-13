@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { DetectorCtx, KeySample, MouseSample } from "../client/src/lib/detector";
-import { aggregate } from "../shared/types";
 import { clickTeleport } from "../client/src/detectors/interaction/clickTeleport";
 import { delayedButton } from "../client/src/detectors/interaction/delayedButton";
 import { exactCenterClick } from "../client/src/detectors/interaction/exactCenterClick";
@@ -10,6 +8,8 @@ import { honeypot } from "../client/src/detectors/interaction/honeypot";
 import { mouseEntropy } from "../client/src/detectors/interaction/mouse";
 import { shiftKeyConsistency } from "../client/src/detectors/interaction/shiftKeyConsistency";
 import { sliderDrag } from "../client/src/detectors/interaction/sliderDrag";
+import type { DetectorCtx, KeySample, MouseSample } from "../client/src/lib/detector";
+import { aggregate } from "../shared/types";
 
 function mkCtx(p: Partial<DetectorCtx> = {}): DetectorCtx {
   return {
@@ -106,7 +106,16 @@ test("delayed button clicked ~human reaction after enable → pass", () => {
 
 test("slider set directly (1 sample, untrusted) → fail; skipped → inconclusive", () => {
   const jumped = sliderDrag.run(
-    mkCtx({ slider: { target: 70, value: 70, samples: [{ v: 70, t: 0, trusted: false }], startedAt: 0, releasedAt: 5, completed: true } }),
+    mkCtx({
+      slider: {
+        target: 70,
+        value: 70,
+        samples: [{ v: 70, t: 0, trusted: false }],
+        startedAt: 0,
+        releasedAt: 5,
+        completed: true,
+      },
+    }),
   ) as { rating: string };
   assert.equal(jumped.rating, "fail");
   const skipped = sliderDrag.run(mkCtx()) as { rating: string };
@@ -122,9 +131,36 @@ test("grid: teleport between far tiles → fail", () => {
       completed: true,
       correct: true,
       clicks: [
-        { tile: 0, t: 0, dxCenter: 0, dyCenter: 0, movesSincePrev: 0, pathLenSincePrev: 0, tileGap: 0, isTrusted: true },
-        { tile: 1, t: 30, dxCenter: 0, dyCenter: 0, movesSincePrev: 0, pathLenSincePrev: 0, tileGap: 200, isTrusted: true },
-        { tile: 2, t: 60, dxCenter: 0, dyCenter: 0, movesSincePrev: 0, pathLenSincePrev: 0, tileGap: 200, isTrusted: true },
+        {
+          tile: 0,
+          t: 0,
+          dxCenter: 0,
+          dyCenter: 0,
+          movesSincePrev: 0,
+          pathLenSincePrev: 0,
+          tileGap: 0,
+          isTrusted: true,
+        },
+        {
+          tile: 1,
+          t: 30,
+          dxCenter: 0,
+          dyCenter: 0,
+          movesSincePrev: 0,
+          pathLenSincePrev: 0,
+          tileGap: 200,
+          isTrusted: true,
+        },
+        {
+          tile: 2,
+          t: 60,
+          dxCenter: 0,
+          dyCenter: 0,
+          movesSincePrev: 0,
+          pathLenSincePrev: 0,
+          tileGap: 200,
+          isTrusted: true,
+        },
       ],
     },
   });
