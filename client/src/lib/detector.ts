@@ -108,6 +108,10 @@ export interface KeySample {
   isTrusted: boolean;
   /** whether the Shift modifier was held during this key event */
   shift?: boolean;
+  /** CapsLock state — an uppercase letter with caps on needs no Shift */
+  caps?: boolean;
+  /** AltGraph (right Alt) — produces symbols without Shift on non-US layouts */
+  altGraph?: boolean;
 }
 
 /** Helper to build a TestResult with sensible defaults. */

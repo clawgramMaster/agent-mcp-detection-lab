@@ -17,9 +17,8 @@ export const exactCenterClick: Detector = {
   run: (ctx) => {
     const measured = ctx.clicks.filter((c) => c.centerDx !== undefined && c.centerDy !== undefined);
     if (measured.length === 0) {
-      // No measurable click (e.g. submitted via Enter) — this decisive (weight 1.0)
-      // detector must stay neutral, not penalize legit keyboard-only users.
-      return result("exactCenterClick", "pass", 0, { measuredClicks: 0 }, undefined, "interaction");
+      // nothing to measure (e.g. submitted via Enter) → inconclusive, not a penalty
+      return result("exactCenterClick", "inconclusive", 0, { measuredClicks: 0 }, undefined, "interaction");
     }
     let exact = 0;
     const hits: Array<{ dx: number; dy: number; w?: number; h?: number }> = [];
@@ -34,8 +33,13 @@ export const exactCenterClick: Detector = {
       }
     }
     const ev = { measuredClicks: measured.length, exactCenter: exact, hits };
-    if (exact >= 1) {
-      return result("exactCenterClick", "fail", Math.min(100, 70 + exact * 15), ev, undefined, "interaction");
+    // A single pixel-perfect centroid hit can happen by luck — require REPEATED
+    // dead-center clicks before it counts as a bot tell.
+    if (exact >= 2) {
+      return result("exactCenterClick", "fail", Math.min(100, 60 + exact * 15), ev, undefined, "interaction");
+    }
+    if (exact === 1) {
+      return result("exactCenterClick", "warn", 30, ev, undefined, "interaction");
     }
     return result("exactCenterClick", "pass", 0, ev, undefined, "interaction");
   },

@@ -10,9 +10,9 @@ export const isTrusted: Detector = {
   label: "Event isTrusted flag",
   category: "interaction",
   run: (ctx) => {
-    const all = [...ctx.mouse, ...ctx.keys];
+    const all = [...ctx.mouse, ...ctx.keys, ...ctx.clicks];
     if (all.length === 0) {
-      return result("isTrusted", "warn", 30, { events: 0 }, undefined, "interaction");
+      return result("isTrusted", "inconclusive", 0, { events: 0 }, undefined, "interaction");
     }
     const untrusted = all.filter((e) => !e.isTrusted).length;
     const ratio = untrusted / all.length;
@@ -34,7 +34,7 @@ export const superhumanSubmit: Detector = {
   category: "interaction",
   run: (ctx) => {
     if (!ctx.submittedAt || !ctx.formShownAt) {
-      return result("superhumanSubmit", "warn", 20, { measured: false }, undefined, "interaction");
+      return result("superhumanSubmit", "inconclusive", 0, { measured: false }, undefined, "interaction");
     }
     const dt = ctx.submittedAt - ctx.formShownAt;
     const ev = { fillToSubmitMs: dt };

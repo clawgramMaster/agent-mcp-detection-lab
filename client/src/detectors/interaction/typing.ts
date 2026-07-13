@@ -14,9 +14,9 @@ export const typingCadence: Detector = {
     if (k.length < 4) {
       return result(
         "typingCadence",
-        "warn",
-        30,
-        { keys: k.length, reason: "too few keystrokes" },
+        "inconclusive",
+        0,
+        { keys: k.length, reason: "too few keystrokes to measure cadence" },
         undefined,
         "interaction",
       );
@@ -56,10 +56,9 @@ export const pasteVsType: Detector = {
     if (ctx.pasted) {
       return result("pasteVsType", "warn", 40, { pasted: true }, undefined, "interaction");
     }
-    // No keystrokes at all — could be a value-injection bot, but a human can
-    // also submit an empty form by clicking, so treat as suspicious, not proof.
+    // No keystrokes at all → nothing to judge (a human can submit without typing).
     if (ctx.keys.length === 0) {
-      return result("pasteVsType", "warn", 40, { pasted: false, keystrokes: 0 }, undefined, "interaction");
+      return result("pasteVsType", "inconclusive", 0, { pasted: false, keystrokes: 0 }, undefined, "interaction");
     }
     return result("pasteVsType", "pass", 0, { pasted: false, keystrokes: ctx.keys.length }, undefined, "interaction");
   },

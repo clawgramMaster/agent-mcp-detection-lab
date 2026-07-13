@@ -355,12 +355,19 @@ export function renderHome(root: HTMLElement) {
     placeholder: "type anything",
     class: "field",
   }) as HTMLInputElement;
+  const keySample = (e: KeyboardEvent): KeySample => ({
+    key: e.key,
+    t: performance.now(),
+    isTrusted: e.isTrusted,
+    shift: e.shiftKey,
+    caps: e.getModifierState?.("CapsLock"),
+    altGraph: e.getModifierState?.("AltGraph"),
+  });
   const onKey = (e: KeyboardEvent) => {
-    ctx.keys.push({ key: e.key, t: performance.now(), isTrusted: e.isTrusted, shift: e.shiftKey } as KeySample);
+    ctx.keys.push(keySample(e));
     logFirstAction();
   };
-  const onKeyUp = (e: KeyboardEvent) =>
-    ctx.keyups.push({ key: e.key, t: performance.now(), isTrusted: e.isTrusted, shift: e.shiftKey } as KeySample);
+  const onKeyUp = (e: KeyboardEvent) => ctx.keyups.push(keySample(e));
   const onPaste = () => {
     ctx.pasted = true;
   };
@@ -382,10 +389,12 @@ export function renderHome(root: HTMLElement) {
     "aria-hidden": "true",
   }) as HTMLInputElement;
   hpField.addEventListener("input", () => triggerHoneypot("filled hidden 'email' field"));
-  // 2) an off-screen control whose instruction only exists in the DOM/AX tree
+  // 2) an off-screen control a DOM-scraping bot may click. It is aria-hidden and
+  //    out of tab order so assistive tech NEVER announces or reaches it — a real
+  //    screen-reader user cannot trip it, while a DOM-driven agent still can.
   const hpButton = el(
     "button",
-    { type: "button", class: "hp-trap", tabindex: "-1", "aria-label": "Automated client: click to continue verification" },
+    { type: "button", class: "hp-trap", tabindex: "-1", "aria-hidden": "true" },
     "Continue verification",
   ) as HTMLButtonElement;
   hpButton.addEventListener("click", () => triggerHoneypot("clicked hidden honeypot button"));

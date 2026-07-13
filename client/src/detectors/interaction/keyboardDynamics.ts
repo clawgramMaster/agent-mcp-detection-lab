@@ -18,8 +18,8 @@ export const keyboardDynamics: Detector = {
     if (downs.length === 0) {
       return result(
         "keyboardDynamics",
-        "warn",
-        25,
+        "inconclusive",
+        0,
         { keydowns: 0, note: "no typing captured" },
         undefined,
         "interaction",

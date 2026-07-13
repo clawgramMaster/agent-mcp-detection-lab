@@ -12,11 +12,13 @@ export const mouseEntropy: Detector = {
   run: (ctx) => {
     const m = ctx.mouse;
     if (m.length < 8) {
+      // can't measure trajectory without movement — NOT a bot signal on its own
+      // (keyboard-only humans have no mouse samples).
       return result(
         "mouseEntropy",
-        "fail",
-        80,
-        { samples: m.length, reason: "too few mouse events" },
+        "inconclusive",
+        0,
+        { samples: m.length, reason: "not enough mouse movement to measure" },
         undefined,
         "interaction",
       );
@@ -62,7 +64,7 @@ export const cdpMouseLeak: Detector = {
   run: (ctx) => {
     const m = ctx.mouse;
     if (m.length < 5) {
-      return result("cdpMouseLeak", "warn", 30, { samples: m.length }, undefined, "interaction");
+      return result("cdpMouseLeak", "inconclusive", 0, { samples: m.length }, undefined, "interaction");
     }
     const zeroMovement = m.filter((s) => s.movementX === 0 && s.movementY === 0).length;
     const zeroRatio = zeroMovement / m.length;
