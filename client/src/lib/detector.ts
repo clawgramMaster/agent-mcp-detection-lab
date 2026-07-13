@@ -136,7 +136,8 @@ export async function runDetectors(
       r.label = r.label ?? d.label;
       r.category = r.category ?? d.category;
     } catch (e) {
-      r = result(d.test, "warn", 10, { error: String(e) }, d.label, d.category);
+      // an exception means we couldn't measure — inconclusive, never a penalty
+      r = result(d.test, "inconclusive", 0, { error: String(e) }, d.label, d.category);
     }
     out.push(r);
     onResult(r);

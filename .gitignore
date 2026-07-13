@@ -6,3 +6,7 @@ data/*.json
 
 # local wrangler / D1 dev state
 .wrangler/
+
+# stray editor temp & scratch screenshots
+*.ts.tmp.*
+tmp/

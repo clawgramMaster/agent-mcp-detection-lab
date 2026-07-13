@@ -1,4 +1,4 @@
-import { type Rating, type TestResult, aggregate } from "../../../shared/types";
+import { type TestResult, type Verdict, aggregate } from "../../../shared/types";
 import { interactionDetectors, staticDetectors } from "../detectors";
 import { currentRunner, fetchInspect, submitResults } from "../lib/api";
 import { startCdpMonitor } from "../lib/cdpMonitor";
@@ -59,14 +59,20 @@ export function renderHome(root: HTMLElement) {
       staticStatus.textContent = `Passive checks — ${failed} test(s) flagged automation traces`;
     }
   }
-  function setBehavioral(results: TestResult[] | null) {
+  function setBehavioral(results: TestResult[] | null): Verdict {
     if (!results || results.length === 0) {
       bNum.textContent = "—";
       bCard.className = "vcard";
-      bLabel.textContent = "interact to measure…";
-      return "pass" as Rating;
+      bLabel.textContent = "complete the challenge, then Verify";
+      return "incomplete";
     }
-    const { botScore, verdict } = aggregate(results);
+    const { botScore, verdict, contributing } = aggregate(results);
+    if (verdict === "incomplete" || contributing === 0) {
+      bNum.textContent = "—";
+      bCard.className = "vcard";
+      bLabel.textContent = "not enough interaction to judge";
+      return "incomplete";
+    }
     bNum.textContent = String(botScore);
     bCard.className = `vcard meter-${verdict}`;
     bLabel.textContent = `${botScore}/100 · ${scoreLabel(botScore)}`;
@@ -451,13 +457,15 @@ export function renderHome(root: HTMLElement) {
     interList.innerHTML = "";
     interStatus.textContent = "Analyzing behavior…";
     const results = await runDetectors(interactionDetectors, ctx, (r) => interList.append(resultRow(r)));
-    const v: Rating = setBehavioral(results);
+    const v: Verdict = setBehavioral(results);
     interStatus.textContent =
       v === "fail"
         ? "Behavioral test done — classified as BOT"
         : v === "warn"
           ? "Behavioral test done — suspicious"
-          : "Behavioral test done — classified as HUMAN";
+          : v === "incomplete"
+            ? "Not enough interaction to judge — complete the challenge steps"
+            : "Behavioral test done — classified as HUMAN";
     try {
       await submitResults("interaction", results);
     } catch {
