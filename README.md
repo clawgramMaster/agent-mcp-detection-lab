@@ -19,31 +19,57 @@ Detection principles are re-implemented from public research
 | Deploy    | Cloudflare Pages (`wrangler`)        |
 | Bench     | Node MCP runner (`bench/`)           |
 
-## Pages
+## The app (single page + report)
 
-- **`/static`** — page-load probes: `webdriver`, CDP `Runtime.enable` leak, injection
-  stack artifacts, console timing, headless signals, WebGL software renderer,
-  prototype tampering, iframe/worker consistency, permissions mismatch, fingerprint.
-- **`/interaction`** — login form probes: `isTrusted`, `shiftKeyConsistency`
-  (physically-impossible keystroke — the killer signal), `exactCenterClick`
-  (pixel-perfect centroid), CDP synthetic mouse leak, mouse-trajectory entropy,
-  click-teleport, keystroke cadence & dwell, paste/value-injection, superhuman submit.
+One page, two independent scores, plus a report view (hash-routed):
+
+- **`#lab`** — the detector page.
+  - **Passive score** — runs the moment you land: `webdriver`, CDP `Runtime.enable`
+    leak, injection stack artifacts, native-fn integrity, exposeFunction bindings,
+    Electron/Node surface, headless signals, UA↔engine coherence, permissions,
+    WebGL software renderer, iframe/worker consistency, media codecs, server-side
+    HTTP-header & TLS checks. A **temporal CDP monitor** keeps watching, so a runner
+    that enables CDP *after* load (calling evaluate/console/snapshot) flips the score
+    live. Informational fingerprint surfaces (canvas, audio, fonts, battery, …) are
+    shown but do not affect the verdict.
+  - **Behavioral score** — an *active challenge* the agent must perform, judged on
+    HOW it acts: a **grid** (ordered tile clicks → motion between targets), a
+    **slider** drag (kinematics), a **"click when it turns green"** button
+    (reaction to a visual change), free typing (`isTrusted`, keystroke dwell/cadence,
+    `shiftKeyConsistency`), and hidden **honeypots** (controls invisible to a real
+    human). Nothing done yet ⇒ verdict is **incomplete**, never a false "bot".
+- **`#report`** — recent runs and the latest score per `runner`, read from
+  `GET /api/sessions`. Drive the lab with `?runner=<name>` to record labelled runs.
 
 See **[`docs/behavioral-detection.md`](docs/behavioral-detection.md)** for the
-physical-constraint behavioral tells (exact-center click, mouse teleport, sparse
-trajectory, metronome typing, shifted-char-without-Shift) — discovered by breaking
-deviceandbrowserinfo.com with agent-browser, with evasion notes and measurements.
-- **`/report`** — per-test pass/warn/fail, raw JSON, `agent-browser` vs `patchright` diff,
-  live SSE feed.
+physical-constraint tells (exact-center click, mouse teleport, sparse trajectory,
+metronome typing, shifted-char-without-Shift) with evasion notes and measurements.
 
 ## Unified result schema
 
 ```json
-{ "test": "cdpMouseLeak", "rating": "pass", "score": 0, "evidence": {}, "timestamp": 0 }
+{ "test": "cdpMouseLeak", "rating": "pass|warn|fail|inconclusive", "score": 0, "evidence": {}, "timestamp": 0 }
 ```
 
-Sessions wrap results with `runner`, `botScore` (0–100), `verdict`, and Cloudflare
-`request.cf` network fingerprint.
+`inconclusive` means the signal couldn't be measured (no interaction, blocked API,
+exception) and **never contributes to the score**. Sessions wrap results with a
+sanitized `runner`, `botScore` (0–100), `verdict` (`pass|warn|fail|incomplete`), and
+the Cloudflare `request.cf` network fingerprint.
+
+## Scoring model (`shared/types.ts`)
+
+`aggregate()` is a **weighted noisy-OR with dedup**:
+
+1. `inconclusive` and unknown / zero-weight detectors are ignored.
+2. Correlated detectors (`EVIDENCE_GROUPS`, e.g. all mouse-motion signals) collapse
+   to their single strongest signal — one physical fact isn't counted five times.
+3. Independent groups combine: `botScore = 100·(1 − ∏(1 − p_group))`.
+4. A **hard rule** (`HARD_RULES`: webdriver, framework globals, honeypot, Node/Electron,
+   binding leak, CSP bypass, live CDP leak) that fails floors the score at 95.
+
+Regression-tested — see `npm test` (`tests/aggregate.test.ts`, `detectors.test.ts`,
+`validate.test.ts`): keyboard-only humans, CapsLock/AltGr, single centroid click,
+idle submit and oversized/unknown API payloads all behave correctly.
 
 ## Develop
 
@@ -79,10 +105,13 @@ Connect the repo in the Cloudflare dashboard for git-push auto-deploys
 LAB_URL=http://127.0.0.1:8788 npm run bench
 ```
 
-`bench/runner.ts` ships a `NullDriver` baseline that exercises the compare pipeline.
-Swap in real `agent-browser` / `patchright` MCP drivers where marked `TODO` to have
-them navigate the live pages under `?runner=<name>`; the client detectors POST results
-automatically and `/report` shows the diff.
+`bench/runner.ts` ships a `NullDriver` baseline that exercises the submit/compare
+pipeline. Swap in real `agent-browser` / `patchright` MCP drivers where marked `TODO`
+to have them navigate the live page under `?runner=<name>`; the client detectors POST
+results automatically and the **`#report`** view (and `GET /api/compare`) shows the diff.
+
+The server sanitizes `runner` and drops unknown/oversized results, and only accepts
+same-origin submissions — so labelled bench runs and real visits stay clean.
 
 ## Notes
 
