@@ -3,7 +3,7 @@ import type { Session, SubmitBody, TestResult } from "../../../shared/types";
 /** Server-side header/TLS inspection (signals the browser JS can't see). */
 export async function fetchInspect(): Promise<TestResult[]> {
   try {
-    const res = await fetch("/api/inspect");
+    const res = await fetch("/api/inspect", { headers: { Accept: "application/json" } });
     if (!res.ok) return [];
     return (await res.json()) as TestResult[];
   } catch {

@@ -44,8 +44,13 @@ app.get("/inspect", (c) => {
     hev.noSecChUa = true;
     hscore += 30;
   }
+  // `Accept: */*` is only a signal on a top-level DOCUMENT navigation (a real
+  // browser sends `text/html,...` there). On this /api/inspect fetch/XHR the
+  // browser legitimately sends `*/*`, so scoring it would false-positive every
+  // real visitor. Only apply the heuristic to a document request.
   const accept = h("accept") || "";
-  if (!accept || accept === "*/*") {
+  const secFetchDest = h("sec-fetch-dest");
+  if (secFetchDest === "document" && (!accept || accept === "*/*")) {
     hev.wildcardAccept = true;
     hscore += 15;
   }

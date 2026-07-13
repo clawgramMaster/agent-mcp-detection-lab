@@ -23,7 +23,7 @@ export function renderHome(root: HTMLElement) {
     el("div", {}, el("div", { class: "verdict-sub" }, "Passive · fingerprint"), sLabel),
   );
   const bNum = el("div", { class: "verdict-num" }, "—");
-  const bLabel = el("div", { class: "verdict-tag" }, "interact to measure…");
+  const bLabel = el("div", { class: "verdict-tag" }, "complete the challenge, then Verify");
   const bCard = el(
     "div",
     { class: "vcard" },
@@ -420,20 +420,22 @@ export function renderHome(root: HTMLElement) {
     ),
   );
 
-  // live: the Behavioral card in the banner updates as the user moves / types
+  // live: show CHALLENGE PROGRESS, not a score. A behavioral verdict before the
+  // task is finished is confusing — the number only appears once you press Verify.
+  const REQUIRED_STEPS = 4;
   const liveTimer = window.setInterval(() => {
-    if (ctx.mouse.length + ctx.keys.length + ctx.clicks.length === 0) return;
-    const live: TestResult[] = [];
-    for (const d of interactionDetectors) {
-      try {
-        const r = d.run(ctx);
-        if (!(r instanceof Promise)) live.push(r);
-      } catch {
-        /* skip */
-      }
-    }
-    setBehavioral(live);
-  }, 600);
+    const done =
+      (ctx.grid?.completed ? 1 : 0) +
+      (ctx.slider?.completed ? 1 : 0) +
+      (ctx.delayed && ctx.delayed.clickedAt > 0 ? 1 : 0) +
+      (ctx.keys.length > 0 ? 1 : 0);
+    bNum.textContent = "—";
+    bCard.className = "vcard";
+    bLabel.textContent =
+      done >= REQUIRED_STEPS
+        ? "all steps done — press Verify to score"
+        : `complete the challenge · ${done}/${REQUIRED_STEPS} steps`;
+  }, 400);
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
