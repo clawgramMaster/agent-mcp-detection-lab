@@ -154,7 +154,6 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   scrollDynamics: 0.4,
   canvasRender: 0.4,
   pointerCapabilities: 0.4,
-  reactionLatency: 0.4,
   superhumanSubmit: 0.4,
   mainWorldExecution: 0.4, // trap; evadable, kept low pending real-runner validation
   pasteVsType: 0.2, // pasting a password is legit human behavior

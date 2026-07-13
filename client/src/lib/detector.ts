@@ -25,8 +25,6 @@ export interface DetectorCtx {
   /** honeypot: agent touched a control/field invisible to real humans */
   honeypotTriggered?: boolean;
   honeypotReasons?: string[];
-  /** per-step reaction latency (ms) from instruction shown → action performed */
-  stepLatencies?: number[];
   /** multi-step grid challenge telemetry */
   grid?: GridState;
   /** slider-drag task telemetry */
@@ -74,7 +72,9 @@ export interface GridState {
   shownAt: number;
   clicks: GridClick[];
   completed: boolean;
+  /** true only if the full sequence was completed with NO wrong tile clicks */
   correct: boolean;
+  wrongClicks: number;
 }
 
 export interface EventSample {

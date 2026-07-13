@@ -3,7 +3,7 @@ import { clickTeleport } from "./interaction/clickTeleport";
 import { delayedButton } from "./interaction/delayedButton";
 import { exactCenterClick } from "./interaction/exactCenterClick";
 import { gridChallenge } from "./interaction/gridChallenge";
-import { honeypot, reactionLatency } from "./interaction/honeypot";
+import { honeypot } from "./interaction/honeypot";
 import { isTrusted, superhumanSubmit } from "./interaction/isTrusted";
 import { keyboardDynamics } from "./interaction/keyboardDynamics";
 import { cdpMouseLeak, mouseEntropy } from "./interaction/mouse";
@@ -81,7 +81,6 @@ export const interactionDetectors: Detector[] = [
   gridChallenge, // motion between ordered tile clicks
   sliderDrag, // drag kinematics to a target
   delayedButton, // react to a visual state change
-  reactionLatency, // superhuman instruction→action latency
   suspiciousClientSideBehavior,
   isTrusted,
   shiftKeyConsistency, // KILLER: physically impossible keystroke

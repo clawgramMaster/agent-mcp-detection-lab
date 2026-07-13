@@ -16,7 +16,7 @@ export const delayedButton: Detector = {
   run: (ctx) => {
     const d = ctx.delayed;
     if (!d || d.clickedAt === 0) {
-      return result("delayedButton", "pass", 0, { note: "not clicked" }, undefined, "interaction");
+      return result("delayedButton", "inconclusive", 0, { note: "not clicked" }, undefined, "interaction");
     }
     const ev: Record<string, unknown> = {
       clickedBeforeEnable: d.clickedBeforeEnable,

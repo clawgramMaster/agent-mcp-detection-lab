@@ -16,10 +16,17 @@ export const sliderDrag: Detector = {
   run: (ctx) => {
     const s = ctx.slider;
     if (!s || s.samples.length === 0) {
-      return result("sliderDrag", "pass", 0, { note: "slider not attempted" }, undefined, "interaction");
+      return result("sliderDrag", "inconclusive", 0, { note: "slider not attempted" }, undefined, "interaction");
     }
     if (!s.completed && s.value !== s.target) {
-      return result("sliderDrag", "pass", 0, { note: "slider incomplete", value: s.value }, undefined, "interaction");
+      return result(
+        "sliderDrag",
+        "inconclusive",
+        0,
+        { note: "slider incomplete", value: s.value },
+        undefined,
+        "interaction",
+      );
     }
 
     const n = s.samples.length;

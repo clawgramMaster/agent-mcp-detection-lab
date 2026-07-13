@@ -21,8 +21,7 @@ export const gridChallenge: Detector = {
   run: (ctx) => {
     const g = ctx.grid;
     if (!g || g.clicks.length === 0) {
-      // neutral: skipping a task is not itself bot-like (avoid penalizing humans)
-      return result("gridChallenge", "pass", 0, { note: "challenge not attempted" }, undefined, "interaction");
+      return result("gridChallenge", "inconclusive", 0, { note: "challenge not attempted" }, undefined, "interaction");
     }
 
     const ev: Record<string, unknown> = {

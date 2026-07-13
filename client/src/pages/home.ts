@@ -157,18 +157,10 @@ export function renderHome(root: HTMLElement) {
     pasted: false,
     honeypotTriggered: false,
     honeypotReasons: [],
-    stepLatencies: [],
   };
   const triggerHoneypot = (reason: string) => {
     ctx.honeypotTriggered = true;
     if (!ctx.honeypotReasons?.includes(reason)) ctx.honeypotReasons?.push(reason);
-  };
-  // reaction latency: first real action after the challenge became visible
-  let firstActionLogged = false;
-  const logFirstAction = () => {
-    if (firstActionLogged) return;
-    firstActionLogged = true;
-    ctx.stepLatencies?.push(Date.now() - ctx.formShownAt);
   };
   const onMove = (e: MouseEvent) => {
     ctx.mouse.push({
@@ -181,7 +173,7 @@ export function renderHome(root: HTMLElement) {
     } as MouseSample);
     if (ctx.mouse.length > 2000) ctx.mouse.shift();
   };
-  const onScroll = () => ctx.scrolls.push({ t: performance.now(), isTrusted: true });
+  const onScroll = (e: Event) => ctx.scrolls.push({ t: performance.now(), isTrusted: e.isTrusted });
   const onWheel = (e: WheelEvent) =>
     ctx.wheels.push({ t: performance.now(), deltaY: e.deltaY, isTrusted: e.isTrusted });
   const onClick = (e: MouseEvent) => {
@@ -204,7 +196,6 @@ export function renderHome(root: HTMLElement) {
       }
     }
     ctx.clicks.push(s);
-    logFirstAction();
   };
   window.addEventListener("mousemove", onMove, { passive: true });
   window.addEventListener("scroll", onScroll, { passive: true });
@@ -218,7 +209,7 @@ export function renderHome(root: HTMLElement) {
     const n = Math.floor(Math.random() * TILE_LABELS.length);
     if (!order.includes(n)) order.push(n);
   }
-  ctx.grid = { targetOrder: order, shownAt: Date.now(), clicks: [], completed: false, correct: false };
+  ctx.grid = { targetOrder: order, shownAt: Date.now(), clicks: [], completed: false, correct: false, wrongClicks: 0 };
 
   let lastMouseIdx = 0;
   let lastCenter: { x: number; y: number } | null = null;
@@ -233,7 +224,6 @@ export function renderHome(root: HTMLElement) {
   for (let i = 0; i < TILE_LABELS.length; i++) {
     const tile = el("button", { type: "button", class: "tile", "data-i": String(i) }, TILE_LABELS[i]) as HTMLButtonElement;
     tile.addEventListener("click", (e: MouseEvent) => {
-      logFirstAction();
       const r = tile.getBoundingClientRect();
       const cx = r.left + r.width / 2;
       const cy = r.top + r.height / 2;
@@ -259,12 +249,15 @@ export function renderHome(root: HTMLElement) {
         expectIdx++;
         tile.classList.add("tile-ok");
       } else {
+        g.wrongClicks++;
         tile.classList.add("tile-bad");
       }
       if (expectIdx >= order.length) {
         g.completed = true;
-        g.correct = true;
-        gridStatus.textContent = "Step 1 done — continue to Step 2.";
+        g.correct = g.wrongClicks === 0; // "correct" only if no wrong tiles were hit
+        gridStatus.textContent = g.correct
+          ? "Step 1 done — continue to Step 2."
+          : "Step 1 done (with wrong taps) — continue to Step 2.";
       }
     });
     gridEl.append(tile);
@@ -295,16 +288,19 @@ export function renderHome(root: HTMLElement) {
     s.value = v;
     s.samples.push({ v, t: performance.now(), trusted: e.isTrusted });
     sliderVal.textContent = String(v);
-    if (v === s.target) {
-      s.completed = true;
-      s.releasedAt = performance.now();
-      sliderStatus.textContent = `Step 2 done — hit ${s.target}.`;
-      sliderInput.classList.add("slider-ok");
-    }
+    // NOTE: do not mark completed here — the handle merely passing OVER the target
+    // mid-drag is not "done". Completion is decided on release (final value).
+    sliderInput.classList.toggle("slider-ok", v === s.target);
   };
   const onSliderRelease = () => {
     const s = ctx.slider;
-    if (s && s.releasedAt === 0 && s.samples.length) s.releasedAt = performance.now();
+    if (!s || !s.samples.length) return;
+    if (s.releasedAt === 0) s.releasedAt = performance.now();
+    // completed only if the FINAL resting value equals the target
+    s.completed = s.value === s.target;
+    sliderStatus.textContent = s.completed
+      ? `Step 2 done — landed on ${s.target}.`
+      : `Step 2 — drag the slider to exactly ${s.target}. (now ${s.value})`;
   };
   sliderInput.addEventListener("pointerdown", onSliderStart);
   sliderInput.addEventListener("input", onSliderInput);
@@ -313,32 +309,34 @@ export function renderHome(root: HTMLElement) {
   const sliderRow = el("div", { class: "slider-row" }, sliderInput, sliderVal);
 
   // ---- Step 3: click the button once it turns green ----
-  ctx.delayed = { enabledAt: 0, clickedAt: 0, clickedBeforeEnable: true, trusted: false };
+  ctx.delayed = { enabledAt: 0, clickedAt: 0, clickedBeforeEnable: false, trusted: false };
   const delayedStatus = el("div", { class: "status" }, "Step 3 — click Continue when it turns green (wait for it).");
+  // IMPORTANT: the button is NOT `disabled` — a disabled button swallows clicks, so
+  // an early (before-enable) click would be unobservable. It is only styled grey;
+  // clicks always register, and clicking before it turns green is the bot tell.
   const delayedBtn = el(
     "button",
-    { type: "button", class: "btn-secondary delayed", disabled: "true" },
+    { type: "button", class: "btn-secondary delayed", "aria-disabled": "true" },
     "Continue (wait…)",
   ) as HTMLButtonElement;
   window.setTimeout(
     () => {
       const d = ctx.delayed;
       if (d) d.enabledAt = performance.now();
-      delayedBtn.disabled = false;
+      delayedBtn.setAttribute("aria-disabled", "false");
       delayedBtn.textContent = "Continue";
       delayedBtn.classList.add("delayed-ready");
     },
     1500 + Math.floor(Math.random() * 1500),
   );
   delayedBtn.addEventListener("click", (e: MouseEvent) => {
-    logFirstAction();
     const d = ctx.delayed;
-    if (!d) return;
+    if (!d || d.clickedAt !== 0) return; // record only the first click
     d.clickedAt = performance.now();
     d.trusted = e.isTrusted;
-    d.clickedBeforeEnable = d.enabledAt === 0;
+    d.clickedBeforeEnable = d.enabledAt === 0; // clicked before it ever turned green
     delayedBtn.classList.add("delayed-done");
-    delayedBtn.textContent = "Continued";
+    delayedBtn.textContent = d.clickedBeforeEnable ? "Clicked too early" : "Continued";
     delayedStatus.textContent = "Step 3 recorded.";
   });
 
@@ -365,7 +363,6 @@ export function renderHome(root: HTMLElement) {
   });
   const onKey = (e: KeyboardEvent) => {
     ctx.keys.push(keySample(e));
-    logFirstAction();
   };
   const onKeyUp = (e: KeyboardEvent) => ctx.keyups.push(keySample(e));
   const onPaste = () => {

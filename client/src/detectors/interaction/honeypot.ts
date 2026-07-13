@@ -27,35 +27,7 @@ export const honeypot: Detector = {
         "interaction",
       );
     }
-    return result("honeypot", "pass", 0, { triggered: false }, undefined, "interaction");
-  },
-};
-
-/**
- * Superhuman reaction — how fast an instruction is acted on.
- * A human needs perception + motor time (~250ms floor, typically 400ms+) between
- * an instruction appearing and completing it. An agent that has already parsed
- * the DOM acts in near-zero time. Fires only on clearly inhuman latencies.
- */
-export const reactionLatency: Detector = {
-  test: "reactionLatency",
-  label: "Instruction reaction time",
-  category: "interaction",
-  run: (ctx) => {
-    const lat = ctx.stepLatencies ?? [];
-    if (lat.length === 0) {
-      return result("reactionLatency", "pass", 0, { steps: 0 }, undefined, "interaction");
-    }
-    const min = Math.min(...lat);
-    const median = [...lat].sort((a, b) => a - b)[Math.floor(lat.length / 2)];
-    const ev = { steps: lat.length, minMs: Math.round(min), medianMs: Math.round(median) };
-    let score = 0;
-    // Below human perceptual+motor floor → machine.
-    if (min < 120) score += 70;
-    else if (min < 250) score += 30;
-    if (median < 250) score += 20;
-    score = Math.min(100, score);
-    const rating = score >= 60 ? "fail" : score >= 25 ? "warn" : "pass";
-    return result("reactionLatency", rating, score, ev, undefined, "interaction");
+    // a one-sided trap: not tripping it is not positive proof of humanity → inconclusive
+    return result("honeypot", "inconclusive", 0, { triggered: false }, undefined, "interaction");
   },
 };
