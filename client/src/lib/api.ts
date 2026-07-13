@@ -11,14 +11,18 @@ export async function fetchInspect(): Promise<TestResult[]> {
   }
 }
 
-const RUNNER_KEY = "agentmcplab.runner";
+const RUNNER_RE = /^[a-z0-9_-]{1,32}$/;
 
-/** The runner label lets the bench harness tag its submissions (?runner=). */
+/**
+ * The runner label lets the bench harness tag its submissions (?runner=patchright).
+ * It is derived ONLY from the current URL — never persisted. Persisting it (the
+ * previous localStorage behavior) leaked a bench label into the next real human
+ * visit and permanently poisoned the dataset.
+ */
 export function currentRunner(): string {
-  const url = new URL(location.href);
-  const q = url.searchParams.get("runner");
-  if (q) localStorage.setItem(RUNNER_KEY, q);
-  return q || localStorage.getItem(RUNNER_KEY) || "human";
+  const q = new URL(location.href).searchParams.get("runner");
+  const s = (q ?? "").toLowerCase().trim();
+  return RUNNER_RE.test(s) ? s : "human";
 }
 
 export async function submitResults(page: "static" | "interaction", results: TestResult[]) {

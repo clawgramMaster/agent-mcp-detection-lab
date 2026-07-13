@@ -3,11 +3,15 @@ import { handle } from "hono/cloudflare-pages";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { type NetworkFingerprint, type Session, type SubmitBody, type TestResult, aggregate } from "../../shared/types";
+import { MAX_RESULTS, VALID_PAGES, cleanResult, sanitizeRunner } from "../../shared/validate";
 
 type Bindings = { DB: D1Database };
 
 const app = new Hono<{ Bindings: Bindings }>().basePath("/api");
 
+// Reads (sessions/compare) are intentionally public — this is a comparison lab.
+// Writes are additionally gated to same-origin inside POST /results, so the open
+// CORS here cannot be used to pollute the dataset from another site.
 app.use("*", cors());
 
 app.get("/health", (c) => c.json({ ok: true, service: "agentmcplab", ts: Date.now() }));
@@ -105,21 +109,43 @@ function readNetwork(req: Request): NetworkFingerprint {
   };
 }
 
-/** POST /api/results — store a completed session */
+/** POST /api/results — store a completed session (validated) */
 app.post("/results", async (c) => {
-  const body = await c.req.json<SubmitBody>();
-  if (!body?.results || !Array.isArray(body.results)) {
-    return c.json({ error: "results[] required" }, 400);
+  // same-origin guard: reject cross-site POSTs that would pollute the dataset
+  const origin = c.req.header("origin");
+  if (origin) {
+    try {
+      if (new URL(origin).host !== new URL(c.req.url).host) {
+        return c.json({ error: "cross-origin submissions are not accepted" }, 403);
+      }
+    } catch {
+      return c.json({ error: "bad origin" }, 400);
+    }
   }
-  const { botScore, verdict } = aggregate(body.results);
+
+  let body: SubmitBody;
+  try {
+    body = await c.req.json<SubmitBody>();
+  } catch {
+    return c.json({ error: "invalid JSON" }, 400);
+  }
+  if (!body || typeof body !== "object") return c.json({ error: "object body required" }, 400);
+  if (!VALID_PAGES.has(body.page)) return c.json({ error: "page must be static|interaction" }, 400);
+  if (!Array.isArray(body.results)) return c.json({ error: "results[] required" }, 400);
+  if (body.results.length > MAX_RESULTS) return c.json({ error: "too many results" }, 413);
+
+  const clean = body.results.map(cleanResult).filter((r): r is TestResult => r !== null);
+  if (clean.length === 0) return c.json({ error: "no valid results" }, 400);
+
+  const { botScore, verdict } = aggregate(clean);
   const sessionId = crypto.randomUUID();
   const network = readNetwork(c.req.raw);
   const session: Session = {
     sessionId,
-    runner: body.runner || "unknown",
-    userAgent: c.req.header("user-agent") || "",
+    runner: sanitizeRunner(body.runner),
+    userAgent: (c.req.header("user-agent") || "").slice(0, 512),
     page: body.page,
-    results: body.results,
+    results: clean,
     botScore,
     verdict,
     network,
@@ -143,7 +169,7 @@ app.post("/results", async (c) => {
     )
     .run();
 
-  return c.json({ sessionId, botScore, verdict, network });
+  return c.json({ sessionId, botScore, verdict, network, accepted: clean.length });
 });
 
 function rowToSession(row: any): Session {
