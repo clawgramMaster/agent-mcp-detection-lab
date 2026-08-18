@@ -4,6 +4,7 @@ import { delayedButton } from "./interaction/delayedButton";
 import { exactCenterClick } from "./interaction/exactCenterClick";
 import { gridChallenge } from "./interaction/gridChallenge";
 import { honeypot } from "./interaction/honeypot";
+import { iframeControlledInput } from "./interaction/iframeControlledInput";
 import { isTrusted, superhumanSubmit } from "./interaction/isTrusted";
 import { keyboardDynamics } from "./interaction/keyboardDynamics";
 import { cdpMouseLeak, mouseEntropy } from "./interaction/mouse";
@@ -80,6 +81,7 @@ export const interactionDetectors: Detector[] = [
   gridChallenge, // motion between ordered tile clicks
   sliderDrag, // drag kinematics to a target
   delayedButton, // react to a visual state change
+  iframeControlledInput, // trusted typing through a nested controlled iframe
   isTrusted,
   shiftKeyConsistency, // KILLER: physically impossible keystroke
   exactCenterClick, // hard physical tell: pixel-perfect centroid click

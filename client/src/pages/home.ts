@@ -3,6 +3,7 @@ import { interactionDetectors, staticDetectors } from "../detectors";
 import { currentRunner, fetchInspect, submitResults } from "../lib/api";
 import { startCdpMonitor } from "../lib/cdpMonitor";
 import { type DetectorCtx, type KeySample, type MouseSample, runDetectors } from "../lib/detector";
+import { normalizeIframeOrigin, parseIframeInputMessage } from "../lib/iframeChallenge";
 import { el, resultRow, scoreLabel } from "../lib/ui";
 
 export function renderHome(root: HTMLElement) {
@@ -159,6 +160,18 @@ export function renderHome(root: HTMLElement) {
     pasted: false,
     honeypotTriggered: false,
     honeypotReasons: [],
+    iframeInput: {
+      eventCount: 0,
+      trustedInputEvents: 0,
+      untrustedInputEvents: 0,
+      eventSamples: [],
+      expectedValue: "",
+      controlledValue: "",
+      complete: false,
+      blurred: false,
+      firstEventAt: 0,
+      completedAt: 0,
+    },
   };
   const triggerHoneypot = (reason: string) => {
     ctx.honeypotTriggered = true;
@@ -346,7 +359,85 @@ export function renderHome(root: HTMLElement) {
     delayedStatus.textContent = "Step 3 recorded.";
   });
 
-  const form = el("form", { class: "login-form", autocomplete: "off" }) as HTMLFormElement;
+  // ---- Step 5: trusted typing into a nested controlled iframe ----
+  const phoneSuffix = String(crypto.getRandomValues(new Uint32Array(1))[0] % 100_000_000).padStart(8, "0");
+  const expectedPhoneDigits = `010${phoneSuffix}`;
+  const expectedPhoneValue = `${expectedPhoneDigits.slice(0, 3)}-${expectedPhoneDigits.slice(3, 7)}-${expectedPhoneDigits.slice(7)}`;
+  if (ctx.iframeInput) ctx.iframeInput.expectedValue = expectedPhoneValue;
+  const requestedIframeOrigin = new URLSearchParams(location.search).get("iframeOrigin")?.replace(/\/$/, "");
+  const defaultIframeOrigin = location.hostname === "lab.otium.team" ? "https://agent-mcp-lab.pages.dev" : undefined;
+  const iframeOrigin = normalizeIframeOrigin(requestedIframeOrigin || defaultIframeOrigin);
+  const iframeMessageOrigin = iframeOrigin ?? location.origin;
+  const iframeChallengeId = crypto.randomUUID();
+  const iframeParams = new URLSearchParams({
+    challengeId: iframeChallengeId,
+    expectedDigits: expectedPhoneDigits,
+    parentOrigin: location.origin,
+  });
+  if (iframeOrigin) iframeParams.set("innerOrigin", iframeOrigin);
+  const iframeSrc = `/iframe-lab/application.html?${iframeParams}`;
+  const iframeStatus = el(
+    "div",
+    { class: "iframe-task-status" },
+    `Enter ${expectedPhoneDigits} in the nested Mobile number field, then click Blur and verify state.`,
+  );
+  const certificateFrame = el("iframe", {
+    id: "applicationIframe",
+    class: "iframe-task-host",
+    src: iframeSrc,
+    title: "Nested certificate mobile-number challenge",
+  }) as HTMLIFrameElement;
+  const iframeTask = el(
+    "div",
+    { class: "iframe-task" },
+    el("div", { class: "step2-label" }, "Step 5 — Nested certificate mobile verification"),
+    iframeStatus,
+    certificateFrame,
+  );
+
+  const nestedInputWindow = (): Window | null => {
+    const applicationDocument = certificateFrame.contentDocument;
+    const sdkFrame = applicationDocument?.querySelector<HTMLIFrameElement>("#finCertSdkIframe");
+    const sdkDocument = sdkFrame?.contentDocument;
+    return sdkDocument?.querySelector<HTMLIFrameElement>("#finCertSdkInnerIframe")?.contentWindow ?? null;
+  };
+  const onIframeMessage = (message: MessageEvent) => {
+    const data = parseIframeInputMessage(message, {
+      challengeId: iframeChallengeId,
+      origin: iframeMessageOrigin,
+      source: nestedInputWindow(),
+    });
+    if (!data) return;
+    const state = ctx.iframeInput;
+    if (!state) return;
+    const now = performance.now();
+    state.eventCount += 1;
+    state.eventSamples.push({
+      event: data.event,
+      key: data.key,
+      t: data.timestamp,
+      trusted: data.isTrusted,
+    });
+    if (state.eventSamples.length > 120) state.eventSamples.splice(0, state.eventSamples.length - 120);
+    if (state.firstEventAt === 0) state.firstEventAt = now;
+    if (data.event === "input") {
+      if (data.isTrusted) state.trustedInputEvents += 1;
+      else state.untrustedInputEvents += 1;
+    }
+    if (typeof data.controlledValue === "string") state.controlledValue = data.controlledValue;
+    state.complete = data.complete === true;
+    if (data.event === "blur") state.blurred = true;
+    if (state.complete && state.blurred && state.completedAt === 0) state.completedAt = now;
+
+    const done = state.complete && state.blurred;
+    iframeStatus.className = `iframe-task-status${done ? " iframe-task-pass" : ""}`;
+    iframeStatus.textContent = done
+      ? `Step 5 done — controlled state retained ${state.controlledValue} after blur · trusted inputs=${state.trustedInputEvents}.`
+      : `Step 5 — state=${state.controlledValue || "empty"} · trusted inputs=${state.trustedInputEvents} · untrusted inputs=${state.untrustedInputEvents}`;
+  };
+  window.addEventListener("message", onIframeMessage);
+
+  const form = el("form", { id: "behavior-form", class: "login-form", autocomplete: "off" }) as HTMLFormElement;
   const user = el("input", {
     type: "text",
     name: "username",
@@ -402,14 +493,18 @@ export function renderHome(root: HTMLElement) {
   ) as HTMLButtonElement;
   hpButton.addEventListener("click", () => triggerHoneypot("clicked hidden honeypot button"));
 
-  const submit = el("button", { type: "submit", class: "btn-primary" }, "Verify me") as HTMLButtonElement;
-  form.append(el("label", {}, "Username", user), el("label", {}, "Password", pass), hpField, hpButton, submit);
+  const submit = el(
+    "button",
+    { type: "submit", form: "behavior-form", class: "btn-primary" },
+    "Verify me",
+  ) as HTMLButtonElement;
+  form.append(el("label", {}, "Username", user), el("label", {}, "Password", pass), hpField, hpButton);
 
   const interList = el("div", { class: "result-list" });
   const interStatus = el(
     "div",
     { class: "status" },
-    "Challenge: type anything into Username and Password, then press Verify. A human does this with real mouse & keystrokes; an agent that parses this page and drives it via automation reveals itself in HOW the actions are performed — and by touching controls a human can't even see.",
+    "Challenge: complete all five steps, then press Verify. We score motion, timing, trusted keyboard delivery, controlled iframe state, and invisible honeypot access.",
   );
   root.append(
     section(
@@ -421,8 +516,10 @@ export function renderHome(root: HTMLElement) {
       sliderRow,
       delayedStatus,
       delayedBtn,
-      el("label", { class: "step2-label" }, "Step 4 — type anything, then Verify"),
+      el("label", { class: "step2-label" }, "Step 4 — type anything into Username and Password"),
       form,
+      iframeTask,
+      submit,
       interStatus,
       interList,
     ),
@@ -430,13 +527,14 @@ export function renderHome(root: HTMLElement) {
 
   // live: show CHALLENGE PROGRESS, not a score. A behavioral verdict before the
   // task is finished is confusing — the number only appears once you press Verify.
-  const REQUIRED_STEPS = 4;
+  const REQUIRED_STEPS = 5;
   const liveTimer = window.setInterval(() => {
     const done =
       (ctx.grid?.completed ? 1 : 0) +
       (ctx.slider?.completed ? 1 : 0) +
       (ctx.delayed && ctx.delayed.clickedAt > 0 ? 1 : 0) +
-      (ctx.keys.length > 0 ? 1 : 0);
+      (ctx.keys.length > 0 ? 1 : 0) +
+      (ctx.iframeInput?.complete && ctx.iframeInput.blurred ? 1 : 0);
     bNum.textContent = "—";
     bCard.className = "vcard";
     bLabel.textContent =
@@ -454,6 +552,7 @@ export function renderHome(root: HTMLElement) {
     window.removeEventListener("scroll", onScroll);
     window.removeEventListener("wheel", onWheel);
     window.removeEventListener("click", onClick);
+    window.removeEventListener("message", onIframeMessage);
     window.clearInterval(liveTimer);
     submit.disabled = true;
     interList.innerHTML = "";

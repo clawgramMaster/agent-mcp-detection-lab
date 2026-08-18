@@ -355,6 +355,41 @@ label {
   font-weight: 500;
 }
 
+/* nested controlled-input challenge */
+.iframe-task {
+  margin: 18px 0 4px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.iframe-task .step2-label {
+  margin: 0;
+}
+.iframe-task-status {
+  margin: 14px 0 10px;
+  padding: 11px 14px;
+  border-left: 4px solid var(--warn);
+  border-radius: 9px;
+  background: var(--warn-bg);
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.iframe-task-status.iframe-task-pass {
+  border-left-color: var(--pass);
+  background: var(--pass-bg);
+  color: var(--pass);
+}
+.iframe-task-host {
+  display: block;
+  width: 100%;
+  height: 340px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
 /* result rows */
 .result-list {
   display: flex;

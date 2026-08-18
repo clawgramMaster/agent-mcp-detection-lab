@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Application frame</title>
+    <style>
+      body { margin: 0; padding: 12px; background: #efece4; font: 13px system-ui, sans-serif; color: #4b463e; }
+      p { margin: 0 0 8px; }
+      iframe { display: block; width: 100%; height: 275px; border: 1px solid #d8d2c5; border-radius: 10px; background: #faf8f4; }
+    </style>
+  </head>
+  <body>
+    <p>Level 1 · application iframe</p>
+    <iframe id="finCertSdkIframe" src="/iframe-lab/sdk.html" title="Financial certificate SDK frame"></iframe>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const innerOrigin = params.get("innerOrigin");
+      const sdkUrl = new URL("/iframe-lab/sdk.html", location.href);
+      for (const key of ["challengeId", "expectedDigits", "parentOrigin"]) {
+        const value = params.get(key);
+        if (value) sdkUrl.searchParams.set(key, value);
+      }
+      if (innerOrigin) sdkUrl.searchParams.set("innerOrigin", innerOrigin);
+      document.querySelector("#finCertSdkIframe").src = sdkUrl.toString();
+    </script>
+  </body>
+</html>

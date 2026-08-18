@@ -6,6 +6,11 @@ data/*.json
 
 # local wrangler / D1 dev state
 .wrangler/
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+wrangler.deploy.toml
 
 # stray editor temp & scratch screenshots
 *.ts.tmp.*

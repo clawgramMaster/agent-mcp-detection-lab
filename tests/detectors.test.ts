@@ -5,10 +5,12 @@ import { delayedButton } from "../client/src/detectors/interaction/delayedButton
 import { exactCenterClick } from "../client/src/detectors/interaction/exactCenterClick";
 import { gridChallenge } from "../client/src/detectors/interaction/gridChallenge";
 import { honeypot } from "../client/src/detectors/interaction/honeypot";
+import { iframeControlledInput } from "../client/src/detectors/interaction/iframeControlledInput";
 import { mouseEntropy } from "../client/src/detectors/interaction/mouse";
 import { shiftKeyConsistency } from "../client/src/detectors/interaction/shiftKeyConsistency";
 import { sliderDrag } from "../client/src/detectors/interaction/sliderDrag";
 import type { DetectorCtx, KeySample, MouseSample } from "../client/src/lib/detector";
+import { normalizeIframeOrigin, parseIframeInputMessage } from "../client/src/lib/iframeChallenge";
 import { aggregate } from "../shared/types";
 
 function mkCtx(p: Partial<DetectorCtx> = {}): DetectorCtx {
@@ -175,4 +177,113 @@ test("idle user (no interaction) → every behavioral detector inconclusive → 
     .filter((r): r is Exclude<typeof r, Promise<unknown>> => !(r instanceof Promise));
   for (const r of results) assert.equal(r.rating, "inconclusive", `${r.test} should be inconclusive`);
   assert.equal(aggregate(results).verdict, "incomplete");
+});
+
+test("nested iframe task passes after trusted controlled input survives blur", () => {
+  const r = iframeControlledInput.run(
+    mkCtx({
+      iframeInput: {
+        eventCount: 36,
+        trustedInputEvents: 11,
+        untrustedInputEvents: 0,
+        eventSamples: Array.from({ length: 11 }, (_, index) => {
+          const t = 100 + index * 120 + (index % 3) * 25;
+          const dwell = 35 + (index % 4) * 15;
+          const key = String(index % 10);
+          return [
+            { event: "keydown", key, t, trusted: true },
+            { event: "input", key: "", t: t + 20, trusted: true },
+            { event: "keyup", key, t: t + dwell, trusted: true },
+          ];
+        }).flat(),
+        expectedValue: "010-1234-5678",
+        controlledValue: "010-1234-5678",
+        complete: true,
+        blurred: true,
+        firstEventAt: 100,
+        completedAt: 1700,
+      },
+    }),
+  ) as { rating: string; score: number };
+  assert.equal(r.rating, "pass");
+  assert.equal(r.score, 0);
+});
+
+test("nested iframe DOM injection fails when only untrusted input is observed", () => {
+  const r = iframeControlledInput.run(
+    mkCtx({
+      iframeInput: {
+        eventCount: 2,
+        trustedInputEvents: 0,
+        untrustedInputEvents: 1,
+        eventSamples: [{ event: "input", key: "", t: 100, trusted: false }],
+        expectedValue: "010-1234-5678",
+        controlledValue: "",
+        complete: false,
+        blurred: false,
+        firstEventAt: 100,
+        completedAt: 0,
+      },
+    }),
+  ) as { rating: string; score: number };
+  assert.equal(r.rating, "fail");
+  assert.equal(r.score, 90);
+});
+
+test("trusted atomic iframe insertion still fails without keyboard dynamics", () => {
+  const r = iframeControlledInput.run(
+    mkCtx({
+      iframeInput: {
+        eventCount: 3,
+        trustedInputEvents: 1,
+        untrustedInputEvents: 0,
+        eventSamples: [
+          { event: "focus", key: "", t: 100, trusted: true },
+          { event: "input", key: "", t: 110, trusted: true },
+          { event: "blur", key: "", t: 120, trusted: true },
+        ],
+        expectedValue: "010-1234-5678",
+        controlledValue: "010-1234-5678",
+        complete: true,
+        blurred: true,
+        firstEventAt: 100,
+        completedAt: 120,
+      },
+    }),
+  ) as { rating: string; score: number };
+  assert.equal(r.rating, "fail");
+  assert.ok(r.score >= 70);
+});
+
+test("iframe challenge accepts only the expected frame, origin, and nonce", () => {
+  const source = {} as MessageEventSource;
+  const payload = {
+    source: "iframe-input-lab",
+    challengeId: "challenge-1",
+    event: "input",
+    key: "",
+    inputType: "insertText",
+    isTrusted: true,
+    controlledValue: "010-1234-5678",
+    complete: true,
+    timestamp: 100,
+  };
+  const expected = { challengeId: "challenge-1", origin: "https://frame.example", source };
+
+  assert.deepEqual(parseIframeInputMessage({ data: payload, origin: expected.origin, source }, expected), payload);
+  assert.equal(parseIframeInputMessage({ data: payload, origin: "https://spoof.example", source }, expected), null);
+  assert.equal(
+    parseIframeInputMessage({ data: payload, origin: expected.origin, source: {} as MessageEventSource }, expected),
+    null,
+  );
+  assert.equal(
+    parseIframeInputMessage({ data: { ...payload, challengeId: "stale" }, origin: expected.origin, source }, expected),
+    null,
+  );
+});
+
+test("iframe origin normalization rejects non-http schemes", () => {
+  assert.equal(normalizeIframeOrigin("https://frame.example/path"), "https://frame.example");
+  assert.equal(normalizeIframeOrigin("javascript:alert(1)"), null);
+  assert.equal(normalizeIframeOrigin("not a url"), null);
 });

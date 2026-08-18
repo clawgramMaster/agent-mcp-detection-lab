@@ -12,6 +12,9 @@ function mount() {
   const app = document.getElementById("app");
   if (!app) return;
   const route = location.hash === "#report" ? "#report" : "#lab";
+  if (location.hash !== route) {
+    history.replaceState(null, "", `${location.pathname}${location.search}${route}`);
+  }
 
   app.innerHTML = "";
   const nav = el(

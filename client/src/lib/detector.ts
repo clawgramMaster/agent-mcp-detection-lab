@@ -31,6 +31,28 @@ export interface DetectorCtx {
   slider?: SliderState;
   /** "click when it turns green" delayed-button task telemetry */
   delayed?: DelayedState;
+  /** masked controlled input inside the nested certificate iframe task */
+  iframeInput?: IframeInputState;
+}
+
+export interface IframeInputState {
+  eventCount: number;
+  trustedInputEvents: number;
+  untrustedInputEvents: number;
+  eventSamples: IframeInputEventSample[];
+  expectedValue: string;
+  controlledValue: string;
+  complete: boolean;
+  blurred: boolean;
+  firstEventAt: number;
+  completedAt: number;
+}
+
+export interface IframeInputEventSample {
+  event: string;
+  key: string;
+  t: number;
+  trusted: boolean;
 }
 
 export interface SliderState {

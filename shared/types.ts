@@ -112,6 +112,7 @@ export const EVIDENCE_GROUPS: Record<string, string> = {
   // keystroke family
   typingCadence: "keystroke",
   keyboardDynamics: "keystroke",
+  iframeControlledInput: "iframe-control",
   // UA / engine consistency family
   clientHints: "ua-consistency",
   engineCoherence: "ua-consistency",
@@ -133,6 +134,7 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   nativeToString: 0.8, // patched native fn (rare benign extensions exist → not "hard")
   cdpMouseLeak: 0.6,
   delayedButton: 0.7, // clicked before enabled / superhuman reaction
+  iframeControlledInput: 0.8, // nested controlled state + trusted keyboard delivery
   gridChallenge: 0.6, // teleport / dead-center / superhuman ordered clicks
   sliderDrag: 0.6, // drag kinematics: jump / linear ramp / superhuman
   mediaCodecs: 0.5,

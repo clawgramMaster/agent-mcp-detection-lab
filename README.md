@@ -36,14 +36,40 @@ One page, two independent scores, plus a report view (hash-routed):
     HOW it acts: a **grid** (ordered tile clicks → motion between targets), a
     **slider** drag (kinematics), a **"click when it turns green"** button
     (reaction to a visual change), free typing (`isTrusted`, keystroke dwell/cadence,
-    `shiftKeyConsistency`), and hidden **honeypots** (controls invisible to a real
-    human). Nothing done yet ⇒ verdict is **incomplete**, never a false "bot".
+    `shiftKeyConsistency`), a three-level certificate iframe with a masked
+    controlled phone input, and hidden **honeypots** (controls invisible to a
+    real human). Nothing done yet ⇒ verdict is **incomplete**, never a false "bot".
 - **`#report`** — recent runs and the latest score per `runner`, read from
   `GET /api/sessions`. Drive the lab with `?runner=<name>` to record labelled runs.
+  Add `?iframeOrigin=https://alternate-host` before `#lab` to load the
+  challenge's innermost fixture from a second deployment hostname and exercise
+  the OOPIF route.
 
 See **[`docs/behavioral-detection.md`](docs/behavioral-detection.md)** for the
 physical-constraint tells (exact-center click, mouse teleport, sparse trajectory,
 metronome typing, shifted-char-without-Shift) with evasion notes and measurements.
+
+### Iframe capability probe
+
+The certificate task mirrors the browser-rs iframe fixes instead of testing only
+whether an agent can find an `<iframe>`:
+
+| browser-rs line | Capability exercised by the fixture |
+|---|---|
+| v0.1.17 | Enter a cross-origin frame without violating the Same-Origin Policy |
+| v0.1.18 | Resolve a three-level nested frame chain by the selected iframe nodes |
+| v0.1.19 | Route commands through the innermost OOPIF target session |
+| v0.1.23 | Deliver trusted keyboard input that updates masked controlled state |
+
+The frame chain is
+`#applicationIframe >> #finCertSdkIframe >> #finCertSdkInnerIframe`. Using
+`browser_iframe_fill` on `#phone` emits an untrusted synthetic input and the
+controlled value stays empty; using `browser_iframe_type` with the random digits
+shown for that run, then `browser_iframe_click` on `#blurCheck`, should retain the
+masked number and complete Step 5. The detector also measures inner-frame key
+dwell and input cadence, rather than treating every trusted CDP typing sequence
+as human. Reports are accepted only from the expected innermost frame, origin,
+and per-run nonce, so a top-page `postMessage` cannot spoof completion.
 
 ## Unified result schema
 
