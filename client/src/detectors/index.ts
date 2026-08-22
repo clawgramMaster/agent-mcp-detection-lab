@@ -1,14 +1,16 @@
 import type { Detector } from "../lib/detector";
 import { clickTeleport } from "./interaction/clickTeleport";
-import { delayedButton } from "./interaction/delayedButton";
+import { detachedNodeClick } from "./interaction/detachedNodeClick";
 import { exactCenterClick } from "./interaction/exactCenterClick";
-import { gridChallenge } from "./interaction/gridChallenge";
 import { honeypot } from "./interaction/honeypot";
+import { hoverMenuSelection } from "./interaction/hoverMenuSelection";
 import { iframeControlledInput } from "./interaction/iframeControlledInput";
 import { isTrusted, superhumanSubmit } from "./interaction/isTrusted";
 import { keyboardDynamics } from "./interaction/keyboardDynamics";
+import { keypadChallenge } from "./interaction/keypadChallenge";
 import { cdpMouseLeak, mouseEntropy } from "./interaction/mouse";
 import { mouseKinematics } from "./interaction/mouseKinematics";
+import { popupOpenerIntegrity } from "./interaction/popupOpenerIntegrity";
 import { scrollDynamics } from "./interaction/scrollDynamics";
 import { shiftKeyConsistency } from "./interaction/shiftKeyConsistency";
 import { sliderDrag } from "./interaction/sliderDrag";
@@ -35,6 +37,7 @@ import { nativeToString } from "./static/nativeToString";
 import { permissionsMismatch } from "./static/permissions";
 import { pointerCapabilities } from "./static/pointerCapabilities";
 import { screenAnomalies } from "./static/screenAnomalies";
+import { shadowDomIntegrity } from "./static/shadowDom";
 import { speechVoices } from "./static/speechVoices";
 import { webdriver } from "./static/webdriver";
 import { webglVendor } from "./static/webgl";
@@ -52,6 +55,7 @@ export const staticDetectors: Detector[] = [
   exposeFunctionLeak,
   mainWorldExecution,
   electronDetection,
+  shadowDomIntegrity,
   // headless / environment tells
   headlessSignals,
   engineCoherence,
@@ -78,9 +82,8 @@ export const staticDetectors: Detector[] = [
 
 export const interactionDetectors: Detector[] = [
   honeypot, // decisive: touched a human-invisible control
-  gridChallenge, // motion between ordered tile clicks
   sliderDrag, // drag kinematics to a target
-  delayedButton, // react to a visual state change
+  keypadChallenge, // click-to-enter PIN on a re-shuffled closed-shadow-root keypad
   iframeControlledInput, // trusted typing through a nested controlled iframe
   isTrusted,
   shiftKeyConsistency, // KILLER: physically impossible keystroke
@@ -94,4 +97,7 @@ export const interactionDetectors: Detector[] = [
   keyboardDynamics,
   pasteVsType,
   superhumanSubmit,
+  detachedNodeClick, // hard-ish: click landing on a node removed from the document
+  popupOpenerIntegrity, // window.opener / referrer integrity of a target=_blank tab
+  hoverMenuSelection, // open-on-hover dropdown: dwell time between open and pick
 ];

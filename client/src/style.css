@@ -330,6 +330,66 @@ label {
   opacity: 0.45;
   cursor: default;
 }
+.btn-secondary {
+  background: #fbf9f4;
+  color: #1b1915;
+  border: 1px solid var(--line, #d9d3c7);
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  margin: 4px 0 20px;
+  text-decoration: none;
+  display: inline-block;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.btn-secondary:hover {
+  border-color: #1b1915;
+}
+.bonus-row {
+  margin: 0 0 20px;
+}
+
+/* Hover dropdown menu (opens on mouseenter, not click) */
+.hover-menu {
+  position: relative;
+  display: inline-block;
+  margin: 0 0 20px;
+}
+.hover-menu-list {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 180px;
+  background: #fbf9f4;
+  border: 1px solid var(--line, #d9d3c7);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(27, 25, 21, 0.18);
+  padding: 6px;
+  z-index: 50;
+}
+.hover-menu.hover-menu-open .hover-menu-list {
+  display: block;
+}
+.hover-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-family: var(--sans);
+  font-size: 13px;
+  cursor: pointer;
+  color: #1b1915;
+}
+.hover-menu-item:hover {
+  background: #efece4;
+}
 .btn-ghost {
   background: var(--surface);
   color: var(--ink-soft);
@@ -696,28 +756,73 @@ label {
   min-width: 2.5ch;
   text-align: right;
 }
-/* Delayed button task */
-.btn-secondary.delayed {
-  margin: 4px 0 20px;
-  padding: 9px 16px;
-  border-radius: 8px;
-  border: 1px solid #d9d3c7;
-  background: #eeeae1;
-  color: #9a9488;
-  cursor: not-allowed;
-  font-size: 14px;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+/* Virtual security keypad task (click-to-enter PIN, no keyboard) */
+.keypad-pin {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 12px;
+  font: 600 20px / 1 "JetBrains Mono", monospace;
 }
-.btn-secondary.delayed-ready {
-  background: #e7f5ec;
-  border-color: #7fd4a0;
-  color: #2f7d52;
-  cursor: pointer;
+.keypad-pin-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--line, #d9d3c7);
+  background: #fbf9f4;
 }
-.btn-secondary.delayed-done {
+.keypad-pin-dot.keypad-pin-filled {
   background: #1b1915;
-  color: #f3f0ea;
   border-color: #1b1915;
+}
+/* the digit buttons themselves render inside a closed shadow root (home.ts) with
+   their own <style>, so page CSS intentionally cannot (and does not need to)
+   reach them — only the light-DOM PIN-progress dots above are styled here. */
+.keypad-host {
+  display: flex;
+  justify-content: center;
+}
+
+/* Popup panel — opened by clicking "Enter PIN", not an inline section. */
+.keypad-popup-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(27, 25, 21, 0.35);
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.keypad-popup-overlay.keypad-popup-open {
+  display: flex;
+}
+.keypad-popup {
+  background: #fbf9f4;
+  border: 1px solid var(--line, #d9d3c7);
+  border-radius: 14px;
+  padding: 16px 18px 20px;
+  box-shadow: 0 12px 40px rgba(27, 25, 21, 0.25);
+  width: 260px;
+}
+.keypad-popup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b655a;
+  margin-bottom: 10px;
+}
+.keypad-popup-close {
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b655a;
+  padding: 0 2px;
+}
+.keypad-popup-close:hover {
+  color: #1b1915;
 }
 
 /* Collapsible passive-check list */

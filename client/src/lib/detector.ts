@@ -25,14 +25,79 @@ export interface DetectorCtx {
   /** honeypot: agent touched a control/field invisible to real humans */
   honeypotTriggered?: boolean;
   honeypotReasons?: string[];
-  /** multi-step grid challenge telemetry */
-  grid?: GridState;
   /** slider-drag task telemetry */
   slider?: SliderState;
-  /** "click when it turns green" delayed-button task telemetry */
-  delayed?: DelayedState;
+  /** virtual security-keypad task telemetry (click-to-enter PIN, no keyboard) */
+  keypad?: KeypadState;
   /** masked controlled input inside the nested certificate iframe task */
   iframeInput?: IframeInputState;
+  /** click behavior across a DOM-churn node swap */
+  detachedClick?: DetachedClickState;
+  /** window.opener / referrer integrity of a target=_blank popup */
+  popupCheck?: PopupCheckState;
+  /** hover-to-reveal dropdown menu selection telemetry */
+  hoverMenu?: HoverMenuState;
+}
+
+/**
+ * Hover dropdown menu: a trigger reveals a small option list purely on
+ * `mouseenter` (no click needed to open) and dismisses itself when the
+ * pointer leaves both the trigger and the menu for something unrelated to
+ * either — the classic desktop nav-menu hover pattern. Selecting an option
+ * this way requires a REAL cursor to (1) dwell on the trigger long enough to
+ * open it, then (2) travel into the menu and land on an option — a script
+ * that opens the menu with a bare synthetic `mouseenter` and immediately
+ * fires a click has no such dwell/travel time at all.
+ */
+export interface HoverMenuState {
+  options: string[];
+  /** performance.now() when the menu became visible via a real mouseenter, 0 = never opened */
+  openedAt: number;
+  selectedOption: string | null;
+  selectedAt: number;
+  trusted: boolean;
+  completed: boolean;
+}
+
+/**
+ * DOM-churn click task: a button is swapped for an equivalent replacement node
+ * partway through the task. A real pointer can only ever hit whatever is
+ * currently rendered; a script holding a stale JS reference to the original
+ * element and calling `.click()` on it directly can "hit" a node that is no
+ * longer in the document at all — something no physical cursor can do.
+ */
+export interface DetachedClickState {
+  /** performance.now() when the original node was detached and replaced, 0 = not yet */
+  swappedAt: number;
+  originalClickedAt: number;
+  /** true only if the click on the original arrived AFTER it was detached */
+  originalClickedAfterSwap: boolean;
+  originalTrusted: boolean;
+  replacementClickedAt: number;
+  replacementTrusted: boolean;
+  completed: boolean;
+}
+
+/**
+ * Popup opener/referrer integrity task: clicking a same-origin
+ * `target="_blank" rel="opener"` link should leave `window.opener` set and
+ * `document.referrer` populated in the new tab. Automation stacks that spawn
+ * tabs via the DevTools Protocol (`Target.createTarget`) instead of a real
+ * anchor navigation frequently lose that linkage. The popup reports its own
+ * diagnostics back over a same-origin BroadcastChannel — a channel that works
+ * regardless of whether `window.opener` survived, so a MISSING report after a
+ * trusted click is itself informative (the tab never became a real
+ * same-origin browsing context at all).
+ */
+export interface PopupCheckState {
+  challengeId: string;
+  clickedAt: number;
+  trustedClick: boolean;
+  completed: boolean;
+  reportedAt: number;
+  openerPresent: boolean | null;
+  referrerNonEmpty: boolean | null;
+  referrerOriginMatches: boolean | null;
 }
 
 export interface IframeInputState {
@@ -65,38 +130,43 @@ export interface SliderState {
   completed: boolean;
 }
 
-export interface DelayedState {
-  /** when the button became enabled (turned green) */
-  enabledAt: number;
-  /** when it was actually clicked */
-  clickedAt: number;
-  clickedBeforeEnable: boolean;
-  trusted: boolean;
-}
-
-export interface GridClick {
-  tile: number;
-  t: number;
-  /** click offset from the tile's exact pixel center */
-  dxCenter: number;
-  dyCenter: number;
-  /** mousemove samples observed since the previous grid click */
-  movesSincePrev: number;
-  /** cursor path length (px) travelled since the previous grid click */
-  pathLenSincePrev: number;
-  /** straight-line distance (px) between previous and current tile centers */
-  tileGap: number;
-  isTrusted: boolean;
-}
-
-export interface GridState {
-  targetOrder: number[];
-  shownAt: number;
-  clicks: GridClick[];
+/**
+ * Virtual security keypad (like a bank / certificate-auth "secure keypad" that
+ * accepts PIN entry only via on-screen clicks, never the physical keyboard, to
+ * defeat keyloggers). The digit layout is randomized and RE-SHUFFLED after every
+ * click, so a script cannot cache absolute screen coordinates across taps — it
+ * must re-locate each digit's new position, same as a human reading the pad.
+ */
+export interface KeypadState {
+  /** target PIN, e.g. [4, 8, 1, 5] */
+  pin: number[];
+  clicks: KeypadClick[];
   completed: boolean;
-  /** true only if the full sequence was completed with NO wrong tile clicks */
+  /** true only if every digit was correct with no wrong taps */
   correct: boolean;
   wrongClicks: number;
+  /** incremented every time the layout is reshuffled (after each accepted click) */
+  shuffles: number;
+}
+
+export interface KeypadClick {
+  digit: number;
+  expectedDigit: number;
+  t: number;
+  /** absolute viewport coordinates of the click */
+  x: number;
+  y: number;
+  /** click offset from the button's exact pixel center */
+  dxCenter: number;
+  dyCenter: number;
+  /** mousemove samples observed since the previous keypad click */
+  movesSincePrev: number;
+  /** cursor path length (px) travelled since the previous keypad click */
+  pathLenSincePrev: number;
+  /** straight-line distance (px) between previous and current button centers
+   *  (the layout reshuffles each click, so this is never a static offset) */
+  targetGap: number;
+  isTrusted: boolean;
 }
 
 export interface EventSample {

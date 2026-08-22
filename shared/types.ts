@@ -94,6 +94,7 @@ export const HARD_RULES: ReadonlySet<string> = new Set([
   "electronDetection",
   "cspBypass",
   "cdpRuntimeLeak",
+  "detachedNodeClick", // a real pointer cannot hit a node removed from the document
 ]);
 
 /**
@@ -129,13 +130,16 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   electronDetection: 1,
   cspBypass: 0.9,
   cdpRuntimeLeak: 1,
+  detachedNodeClick: 1, // a real pointer cannot hit a node removed from the document
   // --- strong heuristics ---
   cdpStackTrace: 0.9, // injected-script sourceURL markers
   nativeToString: 0.8, // patched native fn (rare benign extensions exist → not "hard")
+  shadowDomIntegrity: 0.85, // patched attachShadow / leaked closed shadow root
   cdpMouseLeak: 0.6,
-  delayedButton: 0.7, // clicked before enabled / superhuman reaction
+  secureKeypad: 0.65, // click-to-enter PIN: teleport across a re-shuffled layout / dead-center / superhuman
+  popupOpenerIntegrity: 0.6, // window.opener/referrer integrity of a target=_blank tab
+  hoverMenuSelection: 0.55, // open-on-hover dropdown: dwell time between open and pick
   iframeControlledInput: 0.8, // nested controlled state + trusted keyboard delivery
-  gridChallenge: 0.6, // teleport / dead-center / superhuman ordered clicks
   sliderDrag: 0.6, // drag kinematics: jump / linear ramp / superhuman
   mediaCodecs: 0.5,
   headlessSignals: 0.5,

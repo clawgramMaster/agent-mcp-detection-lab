@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Popup verification</title>
+    <style>
+      body { margin: 0; padding: 24px; font: 13px system-ui, sans-serif; color: #1b1915; background: #faf8f4; }
+      .status { padding: 10px 12px; border-radius: 8px; background: #efece4; color: #6f695f; }
+      code { font: 12px ui-monospace, monospace; }
+    </style>
+  </head>
+  <body>
+    <div id="status" class="status">Verifying…</div>
+    <script>
+      // Reports whether THIS tab really came from a target="_blank" rel="opener" anchor
+      // navigation (window.opener + document.referrer both survive that) —
+      // over a same-origin BroadcastChannel, which works regardless of
+      // whether window.opener itself survived. That decouples "can this tab
+      // report anything at all" from "did the opener link survive", so a
+      // missing report is itself informative on the parent side.
+      const params = new URLSearchParams(location.search);
+      const challengeId = params.get("challengeId") || "";
+      const payload = {
+        source: "popup-lab",
+        challengeId,
+        openerPresent: !!window.opener,
+        referrer: document.referrer || "",
+        ts: Date.now(),
+      };
+      const statusEl = document.querySelector("#status");
+      statusEl.textContent = window.opener
+        ? "Verified — you can close this tab."
+        : "No window.opener detected on this tab — you can close it.";
+      try {
+        if (challengeId && "BroadcastChannel" in window) {
+          const bc = new BroadcastChannel(`amcplab-popup-${challengeId}`);
+          bc.postMessage(payload);
+          setTimeout(() => bc.close(), 1000);
+        }
+      } catch (e) {
+        /* best effort */
+      }
+    </script>
+  </body>
+</html>

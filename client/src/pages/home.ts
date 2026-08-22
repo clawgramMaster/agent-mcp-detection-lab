@@ -200,8 +200,11 @@ export function renderHome(root: HTMLElement) {
       movementY: e.movementY,
       isTrusted: e.isTrusted,
     };
+    // Outside a closed shadow root, keypad clicks are retargeted to the host.
+    // Its center is unrelated to the internal digit; keypad telemetry records
+    // the real button offset in its own handler below.
     const tgt = e.target as Element | null;
-    if (tgt && typeof tgt.getBoundingClientRect === "function") {
+    if (tgt && !tgt.classList.contains("keypad-host") && typeof tgt.getBoundingClientRect === "function") {
       const r = tgt.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) {
         s.centerDx = e.clientX - (r.left + r.width / 2);
@@ -217,75 +220,10 @@ export function renderHome(root: HTMLElement) {
   window.addEventListener("wheel", onWheel, { passive: true });
   window.addEventListener("click", onClick, { passive: true });
 
-  // ---- Step 1: multi-step grid challenge ----
-  const TILE_LABELS = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
-  const order: number[] = [];
-  while (order.length < 3) {
-    const n = Math.floor(Math.random() * TILE_LABELS.length);
-    if (!order.includes(n)) order.push(n);
-  }
-  ctx.grid = { targetOrder: order, shownAt: Date.now(), clicks: [], completed: false, correct: false, wrongClicks: 0 };
-
-  let lastMouseIdx = 0;
-  let lastCenter: { x: number; y: number } | null = null;
-  let expectIdx = 0;
-
-  const gridStatus = el(
-    "div",
-    { class: "status" },
-    `Step 1 — click the tiles in this order:  ${order.map((i) => TILE_LABELS[i]).join("  →  ")}`,
-  );
-  const gridEl = el("div", { class: "tile-grid" });
-  for (let i = 0; i < TILE_LABELS.length; i++) {
-    const tile = el(
-      "button",
-      { type: "button", class: "tile", "data-i": String(i) },
-      TILE_LABELS[i],
-    ) as HTMLButtonElement;
-    tile.addEventListener("click", (e: MouseEvent) => {
-      const r = tile.getBoundingClientRect();
-      const cx = r.left + r.width / 2;
-      const cy = r.top + r.height / 2;
-      let pathLen = 0;
-      for (let k = Math.max(1, lastMouseIdx); k < ctx.mouse.length; k++) {
-        pathLen += Math.hypot(ctx.mouse[k].x - ctx.mouse[k - 1].x, ctx.mouse[k].y - ctx.mouse[k - 1].y);
-      }
-      const g = ctx.grid;
-      if (!g) return;
-      g.clicks.push({
-        tile: i,
-        t: performance.now(),
-        dxCenter: e.clientX - cx,
-        dyCenter: e.clientY - cy,
-        movesSincePrev: ctx.mouse.length - lastMouseIdx,
-        pathLenSincePrev: pathLen,
-        tileGap: lastCenter ? Math.hypot(cx - lastCenter.x, cy - lastCenter.y) : 0,
-        isTrusted: e.isTrusted,
-      });
-      lastMouseIdx = ctx.mouse.length;
-      lastCenter = { x: cx, y: cy };
-      if (i === order[expectIdx]) {
-        expectIdx++;
-        tile.classList.add("tile-ok");
-      } else {
-        g.wrongClicks++;
-        tile.classList.add("tile-bad");
-      }
-      if (expectIdx >= order.length) {
-        g.completed = true;
-        g.correct = g.wrongClicks === 0; // "correct" only if no wrong tiles were hit
-        gridStatus.textContent = g.correct
-          ? "Step 1 done — continue to Step 2."
-          : "Step 1 done (with wrong taps) — continue to Step 2.";
-      }
-    });
-    gridEl.append(tile);
-  }
-
-  // ---- Step 2: slider drag to a target ----
+  // ---- Step 1: slider drag to a target ----
   const sliderTarget = 60 + Math.floor(Math.random() * 25); // 60–84
   ctx.slider = { target: sliderTarget, value: 0, samples: [], startedAt: 0, releasedAt: 0, completed: false };
-  const sliderStatus = el("div", { class: "status" }, `Step 2 — drag the slider to exactly ${sliderTarget}.`);
+  const sliderStatus = el("div", { class: "status" }, `Step 1 — drag the slider to exactly ${sliderTarget}.`);
   const sliderInput = el("input", {
     type: "range",
     min: "0",
@@ -314,12 +252,12 @@ export function renderHome(root: HTMLElement) {
   const onSliderRelease = () => {
     const s = ctx.slider;
     if (!s || !s.samples.length) return;
-    if (s.releasedAt === 0) s.releasedAt = performance.now();
+    s.releasedAt = performance.now();
     // completed only if the FINAL resting value equals the target
     s.completed = s.value === s.target;
     sliderStatus.textContent = s.completed
-      ? `Step 2 done — landed on ${s.target}.`
-      : `Step 2 — drag the slider to exactly ${s.target}. (now ${s.value})`;
+      ? `Step 1 done — landed on ${s.target}.`
+      : `Step 1 — drag the slider to exactly ${s.target}. (now ${s.value})`;
   };
   sliderInput.addEventListener("pointerdown", onSliderStart);
   sliderInput.addEventListener("input", onSliderInput);
@@ -327,39 +265,150 @@ export function renderHome(root: HTMLElement) {
   sliderInput.addEventListener("change", onSliderRelease);
   const sliderRow = el("div", { class: "slider-row" }, sliderInput, sliderVal);
 
-  // ---- Step 3: click the button once it turns green ----
-  ctx.delayed = { enabledAt: 0, clickedAt: 0, clickedBeforeEnable: false, trusted: false };
-  const delayedStatus = el("div", { class: "status" }, "Step 3 — click Continue when it turns green (wait for it).");
-  // IMPORTANT: the button is NOT `disabled` — a disabled button swallows clicks, so
-  // an early (before-enable) click would be unobservable. It is only styled grey;
-  // clicks always register, and clicking before it turns green is the bot tell.
-  const delayedBtn = el(
-    "button",
-    { type: "button", class: "btn-secondary delayed", "aria-disabled": "true" },
-    "Continue (wait…)",
-  ) as HTMLButtonElement;
-  window.setTimeout(
-    () => {
-      const d = ctx.delayed;
-      if (d) d.enabledAt = performance.now();
-      delayedBtn.setAttribute("aria-disabled", "false");
-      delayedBtn.textContent = "Continue";
-      delayedBtn.classList.add("delayed-ready");
-    },
-    1500 + Math.floor(Math.random() * 1500),
-  );
-  delayedBtn.addEventListener("click", (e: MouseEvent) => {
-    const d = ctx.delayed;
-    if (!d || d.clickedAt !== 0) return; // record only the first click
-    d.clickedAt = performance.now();
-    d.trusted = e.isTrusted;
-    d.clickedBeforeEnable = d.enabledAt === 0; // clicked before it ever turned green
-    delayedBtn.classList.add("delayed-done");
-    delayedBtn.textContent = d.clickedBeforeEnable ? "Clicked too early" : "Continued";
-    delayedStatus.textContent = "Step 3 recorded.";
-  });
+  // ---- Step 2: virtual security keypad — click-to-enter PIN, no keyboard ----
+  // Mirrors real bank / cert-auth "secure keypads": clicking a masked PIN field
+  // pops up a small floating panel (not an inline page section) containing a
+  // CLOSED shadow-root keypad (see the `shadowDomIntegrity` passive check) so
+  // the digit↔position mapping can't be read by DOM-walking automation, and the
+  // layout RE-SHUFFLES after every click so on-screen coordinates can't be
+  // cached across taps. The popup closes itself the moment the PIN is complete.
+  const KEYPAD_PIN_LEN = 4;
+  const keypadPin: number[] = Array.from({ length: KEYPAD_PIN_LEN }, () => Math.floor(Math.random() * 10));
+  ctx.keypad = {
+    pin: keypadPin,
+    clicks: [],
+    completed: false,
+    correct: false,
+    wrongClicks: 0,
+    shuffles: 0,
+  };
+  let keypadExpectIdx = 0;
+  let keypadLastMouseIdx = 0;
+  let keypadLastCenter: { x: number; y: number } | null = null;
 
-  // ---- Step 5: trusted typing into a nested controlled iframe ----
+  const keypadStatus = el(
+    "div",
+    { class: "status" },
+    `Step 2 — click "Enter PIN" to open the popup keypad and enter ${keypadPin.join(" ")} (mouse only — no typing).`,
+  );
+  const pinDots: HTMLElement[] = [];
+  const keypadPinRow = el("div", { class: "keypad-pin" });
+  for (let i = 0; i < KEYPAD_PIN_LEN; i++) {
+    const dot = el("span", { class: "keypad-pin-dot" });
+    pinDots.push(dot);
+    keypadPinRow.append(dot);
+  }
+  const keypadOpenBtn = el("button", { type: "button", class: "btn-secondary" }, "Enter PIN") as HTMLButtonElement;
+
+  // The popup itself: a small floating panel, not part of the page flow.
+  const keypadHost = el("div", { class: "keypad-host" });
+  // `attachShadow({ mode: "closed" })` returns the only reference to this tree —
+  // `keypadHost.shadowRoot` reads back `null` to any OTHER script from here on.
+  const keypadShadow = keypadHost.attachShadow({ mode: "closed" });
+  const keypadStyle = document.createElement("style");
+  // page CSS does not pierce a shadow boundary, so the keypad ships its own tiny
+  // stylesheet — real secure-keypad widgets do the same.
+  keypadStyle.textContent = `
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-family: "JetBrains Mono", monospace; }
+    button { aspect-ratio: 1 / 1; border: 1px solid #d9d3c7; border-radius: 10px; background: #fbf9f4; color: #1b1915; font: 600 20px/1 inherit; cursor: pointer; }
+    button:hover:not(:disabled) { border-color: #1b1915; }
+    button:disabled { visibility: hidden; cursor: default; }
+  `;
+  const keypadGrid = document.createElement("div");
+  keypadGrid.className = "grid";
+  keypadShadow.append(keypadStyle, keypadGrid);
+
+  const keypadCloseBtn = el("button", { type: "button", class: "keypad-popup-close" }, "×") as HTMLButtonElement;
+  const keypadPopup = el(
+    "div",
+    { class: "keypad-popup" },
+    el("div", { class: "keypad-popup-head" }, el("span", {}, "Secure keypad"), keypadCloseBtn),
+    keypadHost,
+  );
+  const keypadOverlay = el("div", { class: "keypad-popup-overlay" }, keypadPopup) as HTMLDivElement;
+  let keypadCloseTimer = 0;
+  const closeKeypadPopup = () => keypadOverlay.classList.remove("keypad-popup-open");
+  const openKeypadPopup = () => {
+    if (ctx.keypad?.completed) return;
+    keypadOverlay.classList.add("keypad-popup-open");
+  };
+  keypadCloseBtn.addEventListener("click", closeKeypadPopup);
+  keypadOverlay.addEventListener("click", (e) => {
+    if (e.target === keypadOverlay) closeKeypadPopup(); // click on the backdrop, not the panel
+  });
+  keypadOpenBtn.addEventListener("click", openKeypadPopup);
+
+  const onKeypadDigitClick = (e: MouseEvent, digit: number, btn: HTMLButtonElement) => {
+    const k = ctx.keypad;
+    if (!k || k.completed) return;
+    const r = btn.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    let pathLen = 0;
+    for (let i = Math.max(1, keypadLastMouseIdx); i < ctx.mouse.length; i++) {
+      pathLen += Math.hypot(ctx.mouse[i].x - ctx.mouse[i - 1].x, ctx.mouse[i].y - ctx.mouse[i - 1].y);
+    }
+    const expectedDigit = k.pin[keypadExpectIdx] ?? -1;
+    k.clicks.push({
+      digit,
+      expectedDigit,
+      t: performance.now(),
+      x: e.clientX,
+      y: e.clientY,
+      dxCenter: e.clientX - cx,
+      dyCenter: e.clientY - cy,
+      movesSincePrev: ctx.mouse.length - keypadLastMouseIdx,
+      pathLenSincePrev: pathLen,
+      targetGap: keypadLastCenter ? Math.hypot(cx - keypadLastCenter.x, cy - keypadLastCenter.y) : 0,
+      isTrusted: e.isTrusted,
+    });
+    keypadLastMouseIdx = ctx.mouse.length;
+    keypadLastCenter = { x: cx, y: cy };
+    if (digit === expectedDigit) {
+      pinDots[keypadExpectIdx]?.classList.add("keypad-pin-filled");
+      keypadExpectIdx++;
+    } else {
+      k.wrongClicks++;
+    }
+    if (keypadExpectIdx >= k.pin.length) {
+      k.completed = true;
+      k.correct = k.wrongClicks === 0;
+      keypadOpenBtn.disabled = true;
+      keypadOpenBtn.textContent = "PIN entered";
+      keypadStatus.textContent = k.correct
+        ? "Step 2 done — continue to Step 3."
+        : "Step 2 done (with wrong taps) — continue to Step 3.";
+      keypadCloseTimer = window.setTimeout(closeKeypadPopup, 350); // real secure-keypad popups auto-dismiss on completion
+    } else {
+      k.shuffles++;
+      renderKeypadLayout(); // re-shuffle positions after every click
+    }
+  };
+
+  function renderKeypadLayout() {
+    keypadGrid.innerHTML = "";
+    const cells: (number | null)[] = [...Array.from({ length: 10 }, (_, i) => i), null, null];
+    for (let i = cells.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cells[i], cells[j]] = [cells[j], cells[i]];
+    }
+    for (const digit of cells) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      if (digit === null) {
+        btn.disabled = true;
+        btn.tabIndex = -1;
+        keypadGrid.append(btn);
+        continue;
+      }
+      btn.textContent = String(digit);
+      btn.addEventListener("click", (e: MouseEvent) => onKeypadDigitClick(e, digit, btn));
+      keypadGrid.append(btn);
+    }
+  }
+  renderKeypadLayout();
+
+  // ---- Step 4: trusted typing into a nested controlled iframe ----
   const phoneSuffix = String(crypto.getRandomValues(new Uint32Array(1))[0] % 100_000_000).padStart(8, "0");
   const expectedPhoneDigits = `010${phoneSuffix}`;
   const expectedPhoneValue = `${expectedPhoneDigits.slice(0, 3)}-${expectedPhoneDigits.slice(3, 7)}-${expectedPhoneDigits.slice(7)}`;
@@ -390,7 +439,7 @@ export function renderHome(root: HTMLElement) {
   const iframeTask = el(
     "div",
     { class: "iframe-task" },
-    el("div", { class: "step2-label" }, "Step 5 — Nested certificate mobile verification"),
+    el("div", { class: "step2-label" }, "Step 4 — Nested certificate mobile verification"),
     iframeStatus,
     certificateFrame,
   );
@@ -432,8 +481,8 @@ export function renderHome(root: HTMLElement) {
     const done = state.complete && state.blurred;
     iframeStatus.className = `iframe-task-status${done ? " iframe-task-pass" : ""}`;
     iframeStatus.textContent = done
-      ? `Step 5 done — controlled state retained ${state.controlledValue} after blur · trusted inputs=${state.trustedInputEvents}.`
-      : `Step 5 — state=${state.controlledValue || "empty"} · trusted inputs=${state.trustedInputEvents} · untrusted inputs=${state.untrustedInputEvents}`;
+      ? `Step 4 done — controlled state retained ${state.controlledValue} after blur · trusted inputs=${state.trustedInputEvents}.`
+      : `Step 4 — state=${state.controlledValue || "empty"} · trusted inputs=${state.trustedInputEvents} · untrusted inputs=${state.untrustedInputEvents}`;
   };
   window.addEventListener("message", onIframeMessage);
 
@@ -500,41 +549,212 @@ export function renderHome(root: HTMLElement) {
   ) as HTMLButtonElement;
   form.append(el("label", {}, "Username", user), el("label", {}, "Password", pass), hpField, hpButton);
 
+  // ---- Step 5: DOM-churn click test ----
+  // The button is silently replaced by a look-alike node partway through. A
+  // real pointer can only ever hit what's currently on screen; a script
+  // holding a stale element handle and calling .click() on it can "hit" a
+  // node that's no longer in the document at all.
+  ctx.detachedClick = {
+    swappedAt: 0,
+    originalClickedAt: 0,
+    originalClickedAfterSwap: false,
+    originalTrusted: false,
+    replacementClickedAt: 0,
+    replacementTrusted: false,
+    completed: false,
+  };
+  const bonusClickStatus = el("div", { class: "status" }, "Step 5 — click the button below.");
+  let bonusBtn = el("button", { type: "button", class: "btn-secondary" }, "Click me") as HTMLButtonElement;
+  const bonusClickRow = el("div", { class: "bonus-row" }, bonusBtn);
+  const onBonusClick = (isReplacement: boolean) => (e: MouseEvent) => {
+    const d = ctx.detachedClick;
+    if (!d || d.completed) return;
+    const now = performance.now();
+    if (isReplacement) {
+      d.replacementClickedAt = now;
+      d.replacementTrusted = e.isTrusted;
+    } else {
+      d.originalClickedAt = now;
+      d.originalTrusted = e.isTrusted;
+      d.originalClickedAfterSwap = d.swappedAt > 0 && now >= d.swappedAt;
+    }
+    d.completed = true;
+    bonusClickStatus.textContent = "Step 5 done — continue to Step 6.";
+  };
+  bonusBtn.addEventListener("click", onBonusClick(false));
+  const detachedSwapTimer = window.setTimeout(
+    () => {
+      const d = ctx.detachedClick;
+      if (!d || d.completed) return; // already resolved via an early click — nothing to swap
+      const replacement = el("button", { type: "button", class: "btn-secondary" }, "Click me") as HTMLButtonElement;
+      replacement.addEventListener("click", onBonusClick(true));
+      d.swappedAt = performance.now();
+      bonusBtn.replaceWith(replacement);
+      bonusBtn = replacement;
+    },
+    500 + Math.floor(Math.random() * 400),
+  );
+
+  // ---- Step 6: popup window.opener / referrer integrity ----
+  const popupChallengeId = crypto.randomUUID();
+  ctx.popupCheck = {
+    challengeId: popupChallengeId,
+    clickedAt: 0,
+    trustedClick: false,
+    completed: false,
+    reportedAt: 0,
+    openerPresent: null,
+    referrerNonEmpty: null,
+    referrerOriginMatches: null,
+  };
+  const popupStatus = el("div", { class: "status" }, "Step 6 — open the verification tab (target=_blank).");
+  const popupParams = new URLSearchParams({ challengeId: popupChallengeId });
+  const popupLink = el(
+    "a",
+    { href: `/popup-lab.html?${popupParams}`, target: "_blank", rel: "opener", class: "btn-secondary" },
+    "Open verification tab",
+  ) as HTMLAnchorElement;
+  popupLink.addEventListener("click", (e: MouseEvent) => {
+    const p = ctx.popupCheck;
+    if (!p) return;
+    if (p.completed) {
+      e.preventDefault();
+      return;
+    }
+    p.clickedAt = Date.now();
+    p.trustedClick = e.isTrusted;
+  });
+  let popupChannel: BroadcastChannel | null = null;
+  if ("BroadcastChannel" in window) {
+    popupChannel = new BroadcastChannel(`amcplab-popup-${popupChallengeId}`);
+    popupChannel.onmessage = (msg: MessageEvent) => {
+      const data = msg.data as Record<string, unknown> | undefined;
+      if (!data || data.source !== "popup-lab" || data.challengeId !== popupChallengeId) return;
+      const p = ctx.popupCheck;
+      if (!p || p.clickedAt === 0 || p.completed) return;
+      p.completed = true;
+      p.reportedAt = Date.now();
+      p.openerPresent = !!data.openerPresent;
+      const referrer = typeof data.referrer === "string" ? data.referrer : "";
+      p.referrerNonEmpty = referrer.length > 0;
+      try {
+        p.referrerOriginMatches = new URL(referrer).origin === location.origin;
+      } catch {
+        p.referrerOriginMatches = false;
+      }
+      popupStatus.textContent = `Step 6 done — opener=${p.openerPresent}, referrer=${p.referrerNonEmpty}.`;
+    };
+  }
+
+  // ---- Step 7: hover dropdown menu (open-on-hover, not open-on-click) ----
+  // Unlike the Step 2 keypad (click-only, per design), this menu opens purely
+  // on `mouseenter` and closes itself once the pointer leaves both the
+  // trigger and the menu for something unrelated to either — the classic
+  // desktop nav-menu hover pattern. Selecting requires real dwell+travel time.
+  const HOVER_MENU_OPTIONS = ["Card", "Bank transfer", "Kakao Pay"];
+  ctx.hoverMenu = {
+    options: HOVER_MENU_OPTIONS,
+    openedAt: 0,
+    selectedOption: null,
+    selectedAt: 0,
+    trusted: false,
+    completed: false,
+  };
+  const hoverMenuStatus = el(
+    "div",
+    { class: "status" },
+    "Step 7 — hover over “Payment method” and pick one option (opens on hover, not on click).",
+  );
+  const hoverMenuTrigger = el("button", { type: "button", class: "btn-secondary" }, "Payment method ▾");
+  const hoverMenuList = el(
+    "div",
+    { class: "hover-menu-list" },
+    ...HOVER_MENU_OPTIONS.map((opt) => {
+      const item = el("button", { type: "button", class: "hover-menu-item" }, opt) as HTMLButtonElement;
+      item.addEventListener("click", (e: MouseEvent) => {
+        const h = ctx.hoverMenu;
+        if (!h || h.completed) return;
+        h.selectedOption = opt;
+        h.selectedAt = performance.now();
+        h.trusted = e.isTrusted;
+        h.completed = true;
+        hoverMenuStatus.textContent = `Step 7 done — selected "${opt}".`;
+        closeHoverMenu();
+      });
+      return item;
+    }),
+  );
+  const hoverMenuWrap = el("div", { class: "hover-menu" }, hoverMenuTrigger, hoverMenuList) as HTMLDivElement;
+  let hoverMenuCloseTimer = 0;
+  const cancelHoverMenuClose = () => {
+    if (hoverMenuCloseTimer) window.clearTimeout(hoverMenuCloseTimer);
+    hoverMenuCloseTimer = 0;
+  };
+  function closeHoverMenu() {
+    cancelHoverMenuClose();
+    hoverMenuWrap.classList.remove("hover-menu-open");
+    const h = ctx.hoverMenu;
+    if (h && !h.completed) h.openedAt = 0;
+  }
+  const scheduleHoverMenuClose = () => {
+    cancelHoverMenuClose();
+    if (ctx.hoverMenu?.completed) return;
+    hoverMenuCloseTimer = window.setTimeout(closeHoverMenu, 200);
+  };
+  hoverMenuWrap.addEventListener("mouseenter", () => {
+    cancelHoverMenuClose();
+    const h = ctx.hoverMenu;
+    if (!h || h.completed) return;
+    if (h.openedAt === 0) h.openedAt = performance.now();
+    hoverMenuWrap.classList.add("hover-menu-open");
+  });
+  hoverMenuWrap.addEventListener("mouseleave", scheduleHoverMenuClose);
+
   const interList = el("div", { class: "result-list" });
   const interStatus = el(
     "div",
     { class: "status" },
-    "Challenge: complete all five steps, then press Verify. We score motion, timing, trusted keyboard delivery, controlled iframe state, and invisible honeypot access.",
+    "Challenge: complete all seven steps, then press Verify. We score motion, timing, trusted keyboard delivery, controlled iframe state, and invisible honeypot access.",
   );
   root.append(
     section(
       "② Active challenge (the decisive one)",
       "Complete the task — we judge how it's done, not whether it's done",
-      gridStatus,
-      gridEl,
       sliderStatus,
       sliderRow,
-      delayedStatus,
-      delayedBtn,
-      el("label", { class: "step2-label" }, "Step 4 — type anything into Username and Password"),
+      keypadStatus,
+      keypadPinRow,
+      keypadOpenBtn,
+      el("label", { class: "step2-label" }, "Step 3 — type anything into Username and Password"),
       form,
       iframeTask,
+      bonusClickStatus,
+      bonusClickRow,
+      popupStatus,
+      popupLink,
+      hoverMenuStatus,
+      hoverMenuWrap,
       submit,
       interStatus,
       interList,
     ),
   );
+  // the popup itself renders as an overlay above everything, independent of
+  // the page's normal document flow — appended to <body>, not the section.
+  document.body.append(keypadOverlay);
 
   // live: show CHALLENGE PROGRESS, not a score. A behavioral verdict before the
   // task is finished is confusing — the number only appears once you press Verify.
-  const REQUIRED_STEPS = 5;
+  const REQUIRED_STEPS = 7;
   const liveTimer = window.setInterval(() => {
     const done =
-      (ctx.grid?.completed ? 1 : 0) +
       (ctx.slider?.completed ? 1 : 0) +
-      (ctx.delayed && ctx.delayed.clickedAt > 0 ? 1 : 0) +
-      (ctx.keys.length > 0 ? 1 : 0) +
-      (ctx.iframeInput?.complete && ctx.iframeInput.blurred ? 1 : 0);
+      (ctx.keypad?.completed ? 1 : 0) +
+      (user.value.length > 0 && pass.value.length > 0 ? 1 : 0) +
+      (ctx.iframeInput?.complete && ctx.iframeInput.blurred ? 1 : 0) +
+      (ctx.detachedClick?.completed ? 1 : 0) +
+      (ctx.popupCheck?.completed ? 1 : 0) +
+      (ctx.hoverMenu?.completed ? 1 : 0);
     bNum.textContent = "—";
     bCard.className = "vcard";
     bLabel.textContent =
@@ -554,6 +774,11 @@ export function renderHome(root: HTMLElement) {
     window.removeEventListener("click", onClick);
     window.removeEventListener("message", onIframeMessage);
     window.clearInterval(liveTimer);
+    window.clearTimeout(keypadCloseTimer);
+    window.clearTimeout(detachedSwapTimer);
+    popupChannel?.close();
+    keypadOverlay.remove();
+    cancelHoverMenuClose();
     submit.disabled = true;
     interList.innerHTML = "";
     interStatus.textContent = "Analyzing behavior…";

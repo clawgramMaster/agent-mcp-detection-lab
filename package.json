@@ -4,10 +4,7 @@
   "private": true,
   "description": "AgentMcpLab — self-hosted bot / browser-automation detection lab",
   "type": "module",
-  "workspaces": [
-    "client",
-    "bench"
-  ],
+  "workspaces": ["client", "bench"],
   "scripts": {
     "dev": "npm --workspace client run dev",
     "build": "npm --workspace client run build",
