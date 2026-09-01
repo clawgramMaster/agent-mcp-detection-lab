@@ -12,6 +12,8 @@ import { nativeSelect } from "../client/src/detectors/interaction/nativeSelect";
 import { popupOpenerIntegrity } from "../client/src/detectors/interaction/popupOpenerIntegrity";
 import { shiftKeyConsistency } from "../client/src/detectors/interaction/shiftKeyConsistency";
 import { sliderDrag } from "../client/src/detectors/interaction/sliderDrag";
+import { clipboardShortcutMismatch, pasteVsType } from "../client/src/detectors/interaction/typing";
+import { evaluateChromeShimFidelity } from "../client/src/detectors/static/chromeShimFidelity";
 import { shadowDomIntegrity } from "../client/src/detectors/static/shadowDom";
 import type { DetectorCtx, KeySample, MouseSample } from "../client/src/lib/detector";
 import { normalizeIframeOrigin, parseIframeInputMessage } from "../client/src/lib/iframeChallenge";
@@ -29,6 +31,7 @@ function mkCtx(p: Partial<DetectorCtx> = {}): DetectorCtx {
     formShownAt: 0,
     submittedAt: 0,
     pasted: false,
+    maxValueJump: 0,
     ...p,
   };
 }
@@ -40,6 +43,87 @@ const key = (k: string, over: Partial<KeySample> = {}): KeySample => ({
   caps: false,
   altGraph: false,
   ...over,
+});
+
+test("large value jump after a shortcut-sized key sequence without paste fails", () => {
+  const r = clipboardShortcutMismatch.run(mkCtx({ keys: [key("Control"), key("v")], maxValueJump: 42 })) as {
+    rating: string;
+    score: number;
+  };
+  assert.equal(r.rating, "fail");
+  assert.equal(r.score, 90);
+});
+
+test("real paste event keeps clipboard mismatch clean and pasteVsType behavior unchanged", () => {
+  const ctx = mkCtx({ keys: [key("Control"), key("v")], pasted: true, maxValueJump: 42 });
+  const mismatch = clipboardShortcutMismatch.run(ctx) as { rating: string; score: number };
+  const paste = pasteVsType.run(ctx) as { rating: string; score: number };
+  assert.equal(mismatch.rating, "pass");
+  assert.equal(mismatch.score, 0);
+  assert.equal(paste.rating, "warn");
+  assert.equal(paste.score, 40);
+});
+
+test("ordinary per-character typing does not trigger clipboard mismatch", () => {
+  const r = clipboardShortcutMismatch.run(
+    mkCtx({ keys: "ordinary typing".split("").map((char) => key(char)), maxValueJump: 1 }),
+  ) as { rating: string };
+  assert.equal(r.rating, "pass");
+});
+
+const runtimeEnums = {
+  OnInstalledReason: {},
+  OnRestartRequiredReason: {},
+  PlatformArch: {},
+  PlatformNaclArch: {},
+  PlatformOs: {},
+  RequestUpdateCheckStatus: {},
+};
+
+const loadTimesShape = {
+  requestTime: 1,
+  startLoadTime: 1,
+  commitLoadTime: 1,
+  finishDocumentLoadTime: 1,
+  finishLoadTime: 1,
+  firstPaintTime: 1,
+  firstPaintAfterLoadTime: 0,
+  navigationType: "Other",
+  wasFetchedViaSpdy: false,
+  wasNpnNegotiated: true,
+  npnNegotiatedProtocol: "h2",
+  wasAlternateProtocolAvailable: false,
+  connectionInfo: "h2",
+};
+
+test("sparse chrome.runtime shim missing native enum objects fails fidelity", () => {
+  const r = evaluateChromeShimFidelity({
+    runtime: { connect() {}, sendMessage() {}, onMessage: {}, onConnect: {}, id: undefined },
+    loadTimes: () => loadTimesShape,
+    csi: () => ({ startE: 1, onloadT: 2, pageT: 3, tran: 15 }),
+  });
+  assert.equal(r.rating, "fail");
+  assert.equal(r.score, 60);
+});
+
+test("complete Chrome runtime and timing shapes pass fidelity", () => {
+  const r = evaluateChromeShimFidelity({
+    runtime: runtimeEnums,
+    loadTimes: () => loadTimesShape,
+    csi: () => ({ startE: 1, onloadT: 2, pageT: 3, tran: 15 }),
+  });
+  assert.equal(r.rating, "pass");
+  assert.equal(r.score, 0);
+});
+
+test("malformed Chrome timing return shapes score proportionally", () => {
+  const r = evaluateChromeShimFidelity({
+    runtime: runtimeEnums,
+    loadTimes: () => ({ requestTime: 1, navigationType: 3 }),
+    csi: () => ({ startE: 1 }),
+  });
+  assert.equal(r.rating, "fail");
+  assert.ok(r.score >= 60 && r.score < 100);
 });
 
 test("CapsLock uppercase (shift=false, caps=true) is NOT flagged impossible", () => {

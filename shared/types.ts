@@ -114,11 +114,13 @@ export const EVIDENCE_GROUPS: Record<string, string> = {
   // keystroke family
   typingCadence: "keystroke",
   keyboardDynamics: "keystroke",
+  clipboardShortcutMismatch: "keystroke",
   iframeControlledInput: "iframe-control",
   // UA / engine consistency family
   clientHints: "ua-consistency",
   engineCoherence: "ua-consistency",
   headlessSignals: "ua-consistency",
+  chromeShimFidelity: "ua-consistency",
 };
 
 export const DETECTOR_WEIGHTS: Record<string, number> = {
@@ -145,6 +147,7 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   sliderDrag: 0.6, // drag kinematics: jump / linear ramp / superhuman
   mediaCodecs: 0.5,
   headlessSignals: 0.5,
+  chromeShimFidelity: 0.65, // sparse window.chrome shims miss native runtime/timing structure
   clientHints: 0.5,
   engineCoherence: 0.5,
   permissionsMismatch: 0.5,
@@ -155,6 +158,7 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   clickTeleport: 0.5,
   typingCadence: 0.5,
   keyboardDynamics: 0.5,
+  clipboardShortcutMismatch: 0.65, // large atomic insertion without a real paste event
   httpHeaders: 0.5,
   // --- moderate / weak heuristics ---
   shiftKeyConsistency: 0.5, // demoted from decisive: CapsLock/AltGr/layout FPs (see detector)

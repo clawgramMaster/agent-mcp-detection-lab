@@ -25,8 +25,9 @@ One page, two independent scores, plus a report view (hash-routed):
 
 - **`#lab`** — the detector page.
   - **Passive score** — runs the moment you land: `webdriver`, CDP `Runtime.enable`
-    leak, injection stack artifacts, native-fn integrity, exposeFunction bindings,
-    Electron/Node surface, headless signals, UA↔engine coherence, permissions,
+    leak, injection stack artifacts, native-fn and Chrome-shim fidelity,
+    exposeFunction bindings, Electron/Node surface, headless signals,
+    UA↔engine coherence, permissions,
     WebGL software renderer, iframe/worker consistency, media codecs, server-side
     HTTP-header & TLS checks. A **temporal CDP monitor** keeps watching, so a runner
     that enables CDP *after* load (calling evaluate/console/snapshot) flips the score
@@ -36,8 +37,8 @@ One page, two independent scores, plus a report view (hash-routed):
     HOW it acts: a **grid** (ordered tile clicks → motion between targets), a
     **slider** drag (kinematics), a **"click when it turns green"** button
     (reaction to a visual change), free typing (`isTrusted`, keystroke dwell/cadence,
-    `shiftKeyConsistency`), a three-level certificate iframe with a masked
-    controlled phone input and trusted iframe click, a native select
+    paste-event/value-jump consistency, `shiftKeyConsistency`), a three-level
+    certificate iframe with a masked controlled phone input and trusted iframe click, a native select
     challenge, and hidden **honeypots** (controls invisible to a real human).
     Nothing done yet ⇒ verdict is **incomplete**, never a false "bot".
 - **`#report`** — recent runs and the latest score per `runner`, read from

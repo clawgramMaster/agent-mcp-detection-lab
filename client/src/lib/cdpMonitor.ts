@@ -33,6 +33,7 @@ const EMPTY_CTX: DetectorCtx = {
   formShownAt: 0,
   submittedAt: 0,
   pasted: false,
+  maxValueJump: 0,
 };
 
 const RESCAN = [webdriver, automationGlobals, exposeFunctionLeak];

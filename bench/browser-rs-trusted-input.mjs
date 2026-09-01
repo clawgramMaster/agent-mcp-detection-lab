@@ -126,13 +126,23 @@ try {
   );
   assert(state.value === "wire", `native select chose ${JSON.stringify(state.value)}`);
   assert(state.longValue === longText, "long text value did not match");
-  assert(state.longKeydowns === 0 && state.longKeyups === 0, "long text should use paste-like atomic insertion");
+  assert(
+    state.longKeydowns > 0 &&
+      state.longKeyups > 0 &&
+      state.longKeydowns <= 3 &&
+      state.longKeyups <= 3 &&
+      state.longKeydowns < longText.length &&
+      state.longKeyups < longText.length,
+    "long text should use a constant-size paste shortcut, not a per-character key loop",
+  );
   assert(state.longInputs > 0, "long text emitted no browser input event");
   assert(state.longUntrusted === 0, `long text emitted ${state.longUntrusted} untrusted key events`);
 
   console.log(`PASS trusted iframe click: ${state.iframe}`);
   console.log(`PASS trusted native select: ${state.select}`);
-  console.log(`PASS trusted paste-like long text: ${state.longInputs} input event(s), no keydown/up loop`);
+  console.log(
+    `PASS trusted paste-like long text: ${state.longInputs} input event(s), ${state.longKeydowns}/${state.longKeyups} keydown/up events`,
+  );
 } finally {
   child.kill();
 }

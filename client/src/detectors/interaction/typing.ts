@@ -63,3 +63,31 @@ export const pasteVsType: Detector = {
     return result("pasteVsType", "pass", 0, { pasted: false, keystrokes: ctx.keys.length }, undefined, "interaction");
   },
 };
+
+/**
+ * Clipboard shortcut mismatch -- a physical paste emits a ClipboardEvent before
+ * the value changes. A large atomic value jump after only a shortcut-sized set
+ * of key events, without that paste event, indicates direct text insertion
+ * dressed up with trusted Ctrl/Cmd+V key events.
+ */
+export const clipboardShortcutMismatch: Detector = {
+  test: "clipboardShortcutMismatch",
+  label: "Clipboard shortcut / value-change consistency",
+  category: "interaction",
+  run: (ctx) => {
+    const ev = {
+      pasted: ctx.pasted,
+      maxValueJump: ctx.maxValueJump,
+      keystrokes: ctx.keys.length,
+    };
+    if (ctx.pasted) return result("clipboardShortcutMismatch", "pass", 0, ev, undefined, "interaction");
+    if (ctx.maxValueJump < 8) {
+      const rating = ctx.maxValueJump === 0 ? "inconclusive" : "pass";
+      return result("clipboardShortcutMismatch", rating, 0, ev, undefined, "interaction");
+    }
+    if (ctx.keys.length <= 4) {
+      return result("clipboardShortcutMismatch", "fail", 90, ev, undefined, "interaction");
+    }
+    return result("clipboardShortcutMismatch", "pass", 0, ev, undefined, "interaction");
+  },
+};

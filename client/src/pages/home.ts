@@ -116,6 +116,7 @@ export function renderHome(root: HTMLElement) {
     formShownAt: 0,
     submittedAt: 0,
     pasted: false,
+    maxValueJump: 0,
   };
 
   // Start the temporal CDP monitor IMMEDIATELY — not after the sequential scan —
@@ -158,6 +159,7 @@ export function renderHome(root: HTMLElement) {
     formShownAt: Date.now(),
     submittedAt: 0,
     pasted: false,
+    maxValueJump: 0,
     honeypotTriggered: false,
     honeypotReasons: [],
     iframeInput: {
@@ -521,10 +523,19 @@ export function renderHome(root: HTMLElement) {
     ctx.pasted = true;
   };
   const onFocus = (e: FocusEvent) => ctx.focusEvents.push({ t: performance.now(), isTrusted: e.isTrusted });
+  const previousValues = new WeakMap<HTMLInputElement, string>();
+  const onInput = (e: Event) => {
+    const field = e.currentTarget as HTMLInputElement;
+    const previousValue = previousValues.get(field) ?? "";
+    ctx.maxValueJump = Math.max(ctx.maxValueJump, Math.abs(field.value.length - previousValue.length));
+    previousValues.set(field, field.value);
+  };
   for (const f of [user, pass]) {
+    previousValues.set(f, f.value);
     f.addEventListener("keydown", onKey);
     f.addEventListener("keyup", onKeyUp);
     f.addEventListener("paste", onPaste);
+    f.addEventListener("input", onInput);
     f.addEventListener("focus", onFocus);
   }
   // --- honeypots: present in the DOM, invisible/irrelevant to a real human ---

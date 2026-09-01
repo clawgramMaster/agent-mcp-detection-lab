@@ -13,6 +13,14 @@ import { type Detector, result } from "../../lib/detector";
  */
 const NATIVE_RE = /\{\s*\[native code\]\s*\}/;
 
+type ChromeWindow = Window & {
+  chrome?: {
+    runtime?: { connect?: unknown; sendMessage?: unknown };
+    csi?: unknown;
+    loadTimes?: unknown;
+  };
+};
+
 export const nativeToString: Detector = {
   test: "nativeToString",
   label: "Native function integrity",
@@ -24,6 +32,10 @@ export const nativeToString: Detector = {
 
     // Grab a pristine reference to Function.prototype.toString itself.
     const fnToString = Function.prototype.toString;
+
+    // A self-referential toString Proxy can make both itself and marked shims
+    // look native here. A pristine cross-realm reference raises the bar, but an
+    // automation tool may patch every newly created same-origin realm too.
 
     // toString must itself be native — if patched, everything below is unreliable
     // AND that patching is itself the tell.
@@ -43,6 +55,10 @@ export const nativeToString: Detector = {
       ["HTMLCanvasElement.toDataURL", HTMLCanvasElement.prototype.toDataURL],
       ["navigator.mediaDevices.enumerateDevices", navigator.mediaDevices?.enumerateDevices],
       ["navigator.plugins.item", navigator.plugins?.item],
+      ["window.chrome.runtime.connect", (window as ChromeWindow).chrome?.runtime?.connect],
+      ["window.chrome.runtime.sendMessage", (window as ChromeWindow).chrome?.runtime?.sendMessage],
+      ["window.chrome.csi", (window as ChromeWindow).chrome?.csi],
+      ["window.chrome.loadTimes", (window as ChromeWindow).chrome?.loadTimes],
       [
         "Notification.requestPermission",
         (window as { Notification?: { requestPermission?: unknown } }).Notification?.requestPermission,

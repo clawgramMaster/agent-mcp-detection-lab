@@ -22,6 +22,8 @@ export interface DetectorCtx {
   formShownAt: number;
   submittedAt: number;
   pasted: boolean;
+  /** largest value-length change produced by one input event across tracked fields */
+  maxValueJump: number;
   /** honeypot: agent touched a control/field invisible to real humans */
   honeypotTriggered?: boolean;
   honeypotReasons?: string[];

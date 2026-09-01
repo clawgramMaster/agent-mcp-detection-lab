@@ -15,13 +15,14 @@ import { popupOpenerIntegrity } from "./interaction/popupOpenerIntegrity";
 import { scrollDynamics } from "./interaction/scrollDynamics";
 import { shiftKeyConsistency } from "./interaction/shiftKeyConsistency";
 import { sliderDrag } from "./interaction/sliderDrag";
-import { pasteVsType, typingCadence } from "./interaction/typing";
+import { clipboardShortcutMismatch, pasteVsType, typingCadence } from "./interaction/typing";
 import { audioFingerprint } from "./static/audio";
 import { automationGlobals } from "./static/automationGlobals";
 import { batteryApi } from "./static/batteryApi";
 import { canvasRender } from "./static/canvasRender";
 import { cdpRuntimeLeak, cdpStackTrace } from "./static/cdp";
 import { clientHints } from "./static/clientHints";
+import { chromeShimFidelity } from "./static/chromeShimFidelity";
 import { cspBypass } from "./static/cspBypass";
 import { domRect } from "./static/domRect";
 import { electronDetection } from "./static/electron";
@@ -59,6 +60,7 @@ export const staticDetectors: Detector[] = [
   shadowDomIntegrity,
   // headless / environment tells
   headlessSignals,
+  chromeShimFidelity,
   engineCoherence,
   clientHints,
   screenAnomalies,
@@ -98,6 +100,7 @@ export const interactionDetectors: Detector[] = [
   typingCadence,
   keyboardDynamics,
   pasteVsType,
+  clipboardShortcutMismatch,
   superhumanSubmit,
   detachedNodeClick, // hard-ish: click landing on a node removed from the document
   popupOpenerIntegrity, // window.opener / referrer integrity of a target=_blank tab
