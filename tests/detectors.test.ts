@@ -8,6 +8,7 @@ import { hoverMenuSelection } from "../client/src/detectors/interaction/hoverMen
 import { iframeControlledInput } from "../client/src/detectors/interaction/iframeControlledInput";
 import { keypadChallenge } from "../client/src/detectors/interaction/keypadChallenge";
 import { mouseEntropy } from "../client/src/detectors/interaction/mouse";
+import { nativeSelect } from "../client/src/detectors/interaction/nativeSelect";
 import { popupOpenerIntegrity } from "../client/src/detectors/interaction/popupOpenerIntegrity";
 import { shiftKeyConsistency } from "../client/src/detectors/interaction/shiftKeyConsistency";
 import { sliderDrag } from "../client/src/detectors/interaction/sliderDrag";
@@ -486,6 +487,8 @@ test("nested iframe task passes after trusted controlled input survives blur", (
         eventCount: 36,
         trustedInputEvents: 11,
         untrustedInputEvents: 0,
+        trustedClickEvents: 1,
+        untrustedClickEvents: 0,
         eventSamples: Array.from({ length: 11 }, (_, index) => {
           const t = 100 + index * 120 + (index % 3) * 25;
           const dwell = 35 + (index % 4) * 15;
@@ -516,6 +519,8 @@ test("nested iframe DOM injection fails when only untrusted input is observed", 
         eventCount: 2,
         trustedInputEvents: 0,
         untrustedInputEvents: 1,
+        trustedClickEvents: 0,
+        untrustedClickEvents: 0,
         eventSamples: [{ event: "input", key: "", t: 100, trusted: false }],
         expectedValue: "010-1234-5678",
         controlledValue: "",
@@ -537,6 +542,8 @@ test("trusted atomic iframe insertion still fails without keyboard dynamics", ()
         eventCount: 3,
         trustedInputEvents: 1,
         untrustedInputEvents: 0,
+        trustedClickEvents: 1,
+        untrustedClickEvents: 0,
         eventSamples: [
           { event: "focus", key: "", t: 100, trusted: true },
           { event: "input", key: "", t: 110, trusted: true },
@@ -553,6 +560,64 @@ test("trusted atomic iframe insertion still fails without keyboard dynamics", ()
   ) as { rating: string; score: number };
   assert.equal(r.rating, "fail");
   assert.ok(r.score >= 70);
+});
+
+test("nested iframe task fails when the final click is synthetic", () => {
+  const r = iframeControlledInput.run(
+    mkCtx({
+      iframeInput: {
+        eventCount: 5,
+        trustedInputEvents: 1,
+        untrustedInputEvents: 0,
+        trustedClickEvents: 0,
+        untrustedClickEvents: 1,
+        eventSamples: [
+          { event: "keydown", key: "1", t: 100, trusted: true },
+          { event: "input", key: "", t: 130, trusted: true },
+          { event: "keyup", key: "1", t: 170, trusted: true },
+          { event: "click", key: "", t: 300, trusted: false },
+        ],
+        expectedValue: "010-1234-5678",
+        controlledValue: "010-1234-5678",
+        complete: true,
+        blurred: true,
+        firstEventAt: 100,
+        completedAt: 300,
+      },
+    }),
+  ) as { rating: string; score: number };
+  assert.equal(r.rating, "fail");
+  assert.equal(r.score, 90);
+});
+
+test("native select passes only when input and change are trusted", () => {
+  const pass = nativeSelect.run(
+    mkCtx({
+      nativeSelect: {
+        expectedValue: "wire",
+        value: "wire",
+        inputTrusted: true,
+        changeTrusted: true,
+        eventCount: 2,
+        complete: true,
+      },
+    }),
+  ) as { rating: string };
+  assert.equal(pass.rating, "pass");
+
+  const fail = nativeSelect.run(
+    mkCtx({
+      nativeSelect: {
+        expectedValue: "wire",
+        value: "wire",
+        inputTrusted: false,
+        changeTrusted: false,
+        eventCount: 2,
+        complete: true,
+      },
+    }),
+  ) as { rating: string };
+  assert.equal(fail.rating, "fail");
 });
 
 test("iframe challenge accepts only the expected frame, origin, and nonce", () => {

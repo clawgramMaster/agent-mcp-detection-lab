@@ -164,6 +164,8 @@ export function renderHome(root: HTMLElement) {
       eventCount: 0,
       trustedInputEvents: 0,
       untrustedInputEvents: 0,
+      trustedClickEvents: 0,
+      untrustedClickEvents: 0,
       eventSamples: [],
       expectedValue: "",
       controlledValue: "",
@@ -473,6 +475,10 @@ export function renderHome(root: HTMLElement) {
       if (data.isTrusted) state.trustedInputEvents += 1;
       else state.untrustedInputEvents += 1;
     }
+    if (data.event === "click") {
+      if (data.isTrusted) state.trustedClickEvents += 1;
+      else state.untrustedClickEvents += 1;
+    }
     if (typeof data.controlledValue === "string") state.controlledValue = data.controlledValue;
     state.complete = data.complete === true;
     if (data.event === "blur") state.blurred = true;
@@ -481,8 +487,8 @@ export function renderHome(root: HTMLElement) {
     const done = state.complete && state.blurred;
     iframeStatus.className = `iframe-task-status${done ? " iframe-task-pass" : ""}`;
     iframeStatus.textContent = done
-      ? `Step 4 done — controlled state retained ${state.controlledValue} after blur · trusted inputs=${state.trustedInputEvents}.`
-      : `Step 4 — state=${state.controlledValue || "empty"} · trusted inputs=${state.trustedInputEvents} · untrusted inputs=${state.untrustedInputEvents}`;
+      ? `Step 4 done — controlled state retained ${state.controlledValue} after blur · trusted inputs=${state.trustedInputEvents} · trusted clicks=${state.trustedClickEvents}.`
+      : `Step 4 — state=${state.controlledValue || "empty"} · trusted inputs=${state.trustedInputEvents} · untrusted inputs=${state.untrustedInputEvents} · trusted clicks=${state.trustedClickEvents} · untrusted clicks=${state.untrustedClickEvents}`;
   };
   window.addEventListener("message", onIframeMessage);
 
@@ -710,11 +716,56 @@ export function renderHome(root: HTMLElement) {
   });
   hoverMenuWrap.addEventListener("mouseleave", scheduleHoverMenuClose);
 
+  // ---- Step 8: native select must be changed through trusted input ----
+  const expectedSelectValue = "wire";
+  ctx.nativeSelect = {
+    expectedValue: expectedSelectValue,
+    value: "",
+    inputTrusted: null,
+    changeTrusted: null,
+    eventCount: 0,
+    complete: false,
+  };
+  const nativeSelectStatus = el(
+    "div",
+    { class: "status", id: "nativeSelectStatus" },
+    "Step 8 — choose “Wire transfer” from the native Settlement method dropdown.",
+  );
+  const nativeSelect = el("select", {
+    id: "trustedSelect",
+    name: "settlementMethod",
+    class: "field",
+  }) as HTMLSelectElement;
+  for (const [value, label, disabled] of [
+    ["", "Choose a settlement method", true],
+    ["card", "Corporate card", false],
+    ["wire", "Wire transfer", false],
+    ["escrow", "Escrow", false],
+  ] as const) {
+    const option = el("option", { value }, label) as HTMLOptionElement;
+    option.disabled = disabled;
+    nativeSelect.append(option);
+  }
+  const onNativeSelect = (event: Event) => {
+    const state = ctx.nativeSelect;
+    if (!state) return;
+    state.eventCount += 1;
+    state.value = nativeSelect.value;
+    if (event.type === "input") state.inputTrusted = event.isTrusted;
+    if (event.type === "change") state.changeTrusted = event.isTrusted;
+    state.complete = state.value === state.expectedValue;
+    nativeSelectStatus.className = state.complete ? "status iframe-task-pass" : "status";
+    nativeSelectStatus.textContent = `Step 8 — value=${state.value || "empty"} · input trusted=${String(state.inputTrusted)} · change trusted=${String(state.changeTrusted)}`;
+  };
+  nativeSelect.addEventListener("input", onNativeSelect);
+  nativeSelect.addEventListener("change", onNativeSelect);
+  const nativeSelectTask = el("label", { class: "step2-label" }, "Step 8 — Native settlement method", nativeSelect);
+
   const interList = el("div", { class: "result-list" });
   const interStatus = el(
     "div",
     { class: "status" },
-    "Challenge: complete all seven steps, then press Verify. We score motion, timing, trusted keyboard delivery, controlled iframe state, and invisible honeypot access.",
+    "Challenge: complete all eight steps, then press Verify. We score motion, timing, trusted keyboard delivery, controlled iframe state, and invisible honeypot access.",
   );
   root.append(
     section(
@@ -734,6 +785,8 @@ export function renderHome(root: HTMLElement) {
       popupLink,
       hoverMenuStatus,
       hoverMenuWrap,
+      nativeSelectStatus,
+      nativeSelectTask,
       submit,
       interStatus,
       interList,
@@ -745,7 +798,7 @@ export function renderHome(root: HTMLElement) {
 
   // live: show CHALLENGE PROGRESS, not a score. A behavioral verdict before the
   // task is finished is confusing — the number only appears once you press Verify.
-  const REQUIRED_STEPS = 7;
+  const REQUIRED_STEPS = 8;
   const liveTimer = window.setInterval(() => {
     const done =
       (ctx.slider?.completed ? 1 : 0) +
@@ -754,7 +807,8 @@ export function renderHome(root: HTMLElement) {
       (ctx.iframeInput?.complete && ctx.iframeInput.blurred ? 1 : 0) +
       (ctx.detachedClick?.completed ? 1 : 0) +
       (ctx.popupCheck?.completed ? 1 : 0) +
-      (ctx.hoverMenu?.completed ? 1 : 0);
+      (ctx.hoverMenu?.completed ? 1 : 0) +
+      (ctx.nativeSelect?.complete ? 1 : 0);
     bNum.textContent = "—";
     bCard.className = "vcard";
     bLabel.textContent =

@@ -14,6 +14,7 @@
     "db:init:remote": "wrangler d1 execute agentmcplab --remote --file=./schema.sql",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p client/tsconfig.json --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
+    "test:browser-rs-trusted": "node bench/browser-rs-trusted-input.mjs",
     "lint": "biome lint .",
     "format": "biome format --write .",
     "check": "biome check --write .",

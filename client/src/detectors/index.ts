@@ -10,6 +10,7 @@ import { keyboardDynamics } from "./interaction/keyboardDynamics";
 import { keypadChallenge } from "./interaction/keypadChallenge";
 import { cdpMouseLeak, mouseEntropy } from "./interaction/mouse";
 import { mouseKinematics } from "./interaction/mouseKinematics";
+import { nativeSelect } from "./interaction/nativeSelect";
 import { popupOpenerIntegrity } from "./interaction/popupOpenerIntegrity";
 import { scrollDynamics } from "./interaction/scrollDynamics";
 import { shiftKeyConsistency } from "./interaction/shiftKeyConsistency";
@@ -85,6 +86,7 @@ export const interactionDetectors: Detector[] = [
   sliderDrag, // drag kinematics to a target
   keypadChallenge, // click-to-enter PIN on a re-shuffled closed-shadow-root keypad
   iframeControlledInput, // trusted typing through a nested controlled iframe
+  nativeSelect, // trusted keyboard selection on a native select
   isTrusted,
   shiftKeyConsistency, // KILLER: physically impossible keystroke
   exactCenterClick, // hard physical tell: pixel-perfect centroid click
