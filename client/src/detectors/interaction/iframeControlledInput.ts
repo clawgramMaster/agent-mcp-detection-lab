@@ -23,6 +23,8 @@ export const iframeControlledInput: Detector = {
       events: state.eventCount,
       trustedInputEvents: state.trustedInputEvents,
       untrustedInputEvents: state.untrustedInputEvents,
+      trustedClickEvents: state.trustedClickEvents,
+      untrustedClickEvents: state.untrustedClickEvents,
       expectedValue: state.expectedValue,
       controlledValue: state.controlledValue,
       complete: state.complete,
@@ -70,7 +72,10 @@ export const iframeControlledInput: Detector = {
     if (state.untrustedInputEvents > 0 && state.trustedInputEvents === 0) {
       return result("iframeControlledInput", "fail", 90, { ...evidence, ...dynamics }, undefined, "interaction");
     }
-    if (state.complete && state.blurred && state.trustedInputEvents > 0) {
+    if (state.untrustedClickEvents > 0) {
+      return result("iframeControlledInput", "fail", 90, { ...evidence, ...dynamics }, undefined, "interaction");
+    }
+    if (state.complete && state.blurred && state.trustedInputEvents > 0 && state.trustedClickEvents > 0) {
       let score = 0;
       if (keydowns.length === 0 || keyups.length === 0) score += 70;
       else if (dwells.length < Math.max(3, Math.floor(keydowns.length * 0.6))) score += 35;

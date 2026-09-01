@@ -95,6 +95,7 @@ export const HARD_RULES: ReadonlySet<string> = new Set([
   "cspBypass",
   "cdpRuntimeLeak",
   "detachedNodeClick", // a real pointer cannot hit a node removed from the document
+  "nativeSelect",
 ]);
 
 /**
@@ -131,6 +132,7 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   cspBypass: 0.9,
   cdpRuntimeLeak: 1,
   detachedNodeClick: 1, // a real pointer cannot hit a node removed from the document
+  nativeSelect: 1,
   // --- strong heuristics ---
   cdpStackTrace: 0.9, // injected-script sourceURL markers
   nativeToString: 0.8, // patched native fn (rare benign extensions exist → not "hard")

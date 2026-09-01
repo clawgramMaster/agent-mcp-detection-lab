@@ -37,8 +37,9 @@ One page, two independent scores, plus a report view (hash-routed):
     **slider** drag (kinematics), a **"click when it turns green"** button
     (reaction to a visual change), free typing (`isTrusted`, keystroke dwell/cadence,
     `shiftKeyConsistency`), a three-level certificate iframe with a masked
-    controlled phone input, and hidden **honeypots** (controls invisible to a
-    real human). Nothing done yet ⇒ verdict is **incomplete**, never a false "bot".
+    controlled phone input and trusted iframe click, a native select
+    challenge, and hidden **honeypots** (controls invisible to a real human).
+    Nothing done yet ⇒ verdict is **incomplete**, never a false "bot".
 - **`#report`** — recent runs and the latest score per `runner`, read from
   `GET /api/sessions`. Drive the lab with `?runner=<name>` to record labelled runs.
   Add `?iframeOrigin=https://alternate-host` before `#lab` to load the
@@ -60,16 +61,16 @@ whether an agent can find an `<iframe>`:
 | v0.1.18 | Resolve a three-level nested frame chain by the selected iframe nodes |
 | v0.1.19 | Route commands through the innermost OOPIF target session |
 | v0.1.23 | Deliver trusted keyboard input that updates masked controlled state |
+| v0.2.0 | Deliver a trusted pointer click across nested/OOPIF coordinates |
 
 The frame chain is
-`#applicationIframe >> #finCertSdkIframe >> #finCertSdkInnerIframe`. Using
-`browser_iframe_fill` on `#phone` emits an untrusted synthetic input and the
-controlled value stays empty; using `browser_iframe_type` with the random digits
-shown for that run, then `browser_iframe_click` on `#blurCheck`, should retain the
-masked number and complete Step 5. The detector also measures inner-frame key
-dwell and input cadence, rather than treating every trusted CDP typing sequence
-as human. Reports are accepted only from the expected innermost frame, origin,
-and per-run nonce, so a top-page `postMessage` cannot spoof completion.
+`#applicationIframe >> #finCertSdkIframe >> #finCertSdkInnerIframe`.
+`browser_iframe_type` enters the random digits shown for that run, then
+`browser_iframe_click` must click `#blurCheck` with `isTrusted === true` to
+retain the masked number and complete Step 4. The detector measures inner-frame
+key dwell, input cadence, and click trust rather than accepting state changes
+alone. Reports are accepted only from the expected innermost frame, origin, and
+per-run nonce, so a top-page `postMessage` cannot spoof completion.
 
 ## Unified result schema
 
@@ -130,6 +131,14 @@ Connect the repo in the Cloudflare dashboard for git-push auto-deploys
 ```bash
 LAB_URL=http://127.0.0.1:8788 npm run bench
 ```
+
+The targeted browser-rs v0.2 regression runner asserts that synthetic pointer
+and iframe-fill surfaces are absent, then proves nested/OOPIF
+`browser_iframe_click`, native `browser_select_option`, and paste-like
+long-text `browser_type` input events are trusted.
+Run it against a local lab with:
+
+    BROWSER_RS_BIN=~/browser-rs-mcp/target/release/browser-rs LAB_URL=http://127.0.0.1:4173 npm run test:browser-rs-trusted
 
 `bench/runner.ts` ships a `NullDriver` baseline that exercises the submit/compare
 pipeline. Swap in real `agent-browser` / `patchright` MCP drivers where marked `TODO`

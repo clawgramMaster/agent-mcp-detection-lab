@@ -31,6 +31,8 @@ export interface DetectorCtx {
   keypad?: KeypadState;
   /** masked controlled input inside the nested certificate iframe task */
   iframeInput?: IframeInputState;
+  /** native select changed through browser-generated keyboard input */
+  nativeSelect?: NativeSelectState;
   /** click behavior across a DOM-churn node swap */
   detachedClick?: DetachedClickState;
   /** window.opener / referrer integrity of a target=_blank popup */
@@ -104,6 +106,8 @@ export interface IframeInputState {
   eventCount: number;
   trustedInputEvents: number;
   untrustedInputEvents: number;
+  trustedClickEvents: number;
+  untrustedClickEvents: number;
   eventSamples: IframeInputEventSample[];
   expectedValue: string;
   controlledValue: string;
@@ -111,6 +115,15 @@ export interface IframeInputState {
   blurred: boolean;
   firstEventAt: number;
   completedAt: number;
+}
+
+export interface NativeSelectState {
+  expectedValue: string;
+  value: string;
+  inputTrusted: boolean | null;
+  changeTrusted: boolean | null;
+  eventCount: number;
+  complete: boolean;
 }
 
 export interface IframeInputEventSample {
