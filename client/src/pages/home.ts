@@ -3,7 +3,7 @@ import { interactionDetectors, staticDetectors } from "../detectors";
 import { currentRunner, fetchInspect, submitResults } from "../lib/api";
 import { startCdpMonitor } from "../lib/cdpMonitor";
 import { type DetectorCtx, type KeySample, type MouseSample, runDetectors } from "../lib/detector";
-import { normalizeIframeOrigin, parseIframeInputMessage } from "../lib/iframeChallenge";
+import { normalizeIframeOrigin, parseHoverShadowMessage, parseIframeInputMessage } from "../lib/iframeChallenge";
 import { el, resultRow, scoreLabel } from "../lib/ui";
 
 export function renderHome(root: HTMLElement) {
@@ -204,16 +204,11 @@ export function renderHome(root: HTMLElement) {
       movementY: e.movementY,
       isTrusted: e.isTrusted,
     };
-    // Outside a closed shadow root, clicks are retargeted to the host. Its
-    // center is unrelated to the internal control; dedicated challenge
-    // telemetry records the meaningful interaction inside each shadow tree.
+    // Outside a closed shadow root, keypad clicks are retargeted to the host.
+    // Its center is unrelated to the internal digit; keypad telemetry records
+    // the real button offset in its own handler below.
     const tgt = e.target as Element | null;
-    if (
-      tgt &&
-      !tgt.classList.contains("keypad-host") &&
-      !tgt.classList.contains("hover-menu-host") &&
-      typeof tgt.getBoundingClientRect === "function"
-    ) {
+    if (tgt && !tgt.classList.contains("keypad-host") && typeof tgt.getBoundingClientRect === "function") {
       const r = tgt.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) {
         s.centerDx = e.clientX - (r.left + r.width / 2);
@@ -706,13 +701,18 @@ export function renderHome(root: HTMLElement) {
     };
   }
 
-  // ---- Step 7: closed Shadow DOM hover menu (open-on-hover, not open-on-click) ----
+  // ---- Step 7: iframe + closed Shadow DOM hover menu ----
+  // The interaction surface crosses an iframe boundary, then hides its menu
+  // inside a closed shadow root. Only postMessage telemetry from the expected
+  // origin, frame window, and per-run challenge is accepted back here.
   const HOVER_MENU_OPTIONS = ["Card", "Bank transfer", "Kakao Pay"];
   const expectedHoverOption = HOVER_MENU_OPTIONS[randomInt(HOVER_MENU_OPTIONS.length)];
+  const hoverChallengeId = crypto.randomUUID();
   ctx.hoverMenu = {
     options: HOVER_MENU_OPTIONS,
     expectedOption: expectedHoverOption,
     openedAt: 0,
+    hoverTrusted: null,
     selectedOption: null,
     selectedAt: 0,
     trusted: false,
@@ -720,77 +720,56 @@ export function renderHome(root: HTMLElement) {
   };
   const hoverMenuStatus = el(
     "div",
-    { class: "status" },
-    `Step 7 — hover over “Payment method” and choose “${expectedHoverOption}” (opens on hover, not on click).`,
+    { class: "iframe-task-status" },
+    `Hover inside the frame and choose “${expectedHoverOption}” from the Shadow DOM menu.`,
   );
-  const hoverMenuHost = el("div", { class: "hover-menu-host" });
-  const hoverMenuShadow = hoverMenuHost.attachShadow({ mode: "closed" });
-  const hoverMenuStyle = el(
-    "style",
-    {},
-    `
-      .wrap { position: relative; display: inline-block; min-width: 210px; padding-bottom: 125px; }
-      .trigger { width: 210px; padding: 11px 14px; border: 1px solid var(--line-strong, #d8d2c5); border-radius: 8px; background: var(--surface, white); color: var(--ink, #1b1915); font: 600 14px system-ui, sans-serif; text-align: left; cursor: default; }
-      .trigger:focus-visible { outline: 2px solid var(--pass, #3f7d54); outline-offset: 2px; }
-      .menu { display: none; position: absolute; top: 46px; left: 0; box-sizing: border-box; width: 210px; padding: 6px; border: 1px solid var(--line-strong, #d8d2c5); border-radius: 8px; background: var(--surface, white); box-shadow: 0 8px 20px rgba(27, 25, 21, .16); }
-      .open .menu { display: block; }
-      .item { display: block; width: 100%; padding: 8px 10px; border: 0; border-radius: 5px; background: transparent; color: var(--ink, #1b1915); font: 13px system-ui, sans-serif; text-align: left; cursor: pointer; }
-      .item:hover, .item:focus-visible { background: var(--pass-bg, #e8efe6); outline: none; }
-    `,
+  const hoverFrameUrl = new URL("/iframe-lab/hover-shadow.html", iframeOrigin ?? location.origin);
+  hoverFrameUrl.search = new URLSearchParams({
+    challengeId: hoverChallengeId,
+    expectedOption: expectedHoverOption,
+    parentOrigin: location.origin,
+  }).toString();
+  const hoverFrame = el("iframe", {
+    class: "iframe-task-host hover-shadow-frame",
+    src: hoverFrameUrl.toString(),
+    title: "Shadow DOM payment-method hover challenge",
+  }) as HTMLIFrameElement;
+  const hoverMenuTask = el(
+    "div",
+    { class: "iframe-task" },
+    el("div", { class: "step2-label" }, "Step 7 — Iframe Shadow DOM hover menu"),
+    hoverMenuStatus,
+    hoverFrame,
   );
-  const hoverMenuTrigger = el("button", { type: "button", class: "trigger" }, "Payment method ▾");
-  const hoverMenuList = el("div", { class: "menu", role: "menu" });
-  const hoverMenuWrap = el("div", { class: "wrap" }, hoverMenuTrigger, hoverMenuList);
-  let hoverMenuCloseTimer = 0;
-  const cancelHoverMenuClose = () => {
-    if (hoverMenuCloseTimer) window.clearTimeout(hoverMenuCloseTimer);
-    hoverMenuCloseTimer = 0;
-  };
-  const closeHoverMenu = () => {
-    cancelHoverMenuClose();
-    hoverMenuWrap.classList.remove("open");
-    const h = ctx.hoverMenu;
-    if (h && !h.completed) h.openedAt = 0;
-  };
-  const scheduleHoverMenuClose = () => {
-    cancelHoverMenuClose();
-    if (ctx.hoverMenu?.completed) return;
-    hoverMenuCloseTimer = window.setTimeout(closeHoverMenu, 180);
-  };
-  hoverMenuTrigger.addEventListener("mouseenter", (event: MouseEvent) => {
-    cancelHoverMenuClose();
-    const h = ctx.hoverMenu;
-    if (!h || h.completed || !event.isTrusted) return;
-    if (h.openedAt === 0) h.openedAt = performance.now();
-    hoverMenuWrap.classList.add("open");
-  });
-  hoverMenuTrigger.addEventListener("mouseleave", scheduleHoverMenuClose);
-  hoverMenuTrigger.addEventListener("click", (event: MouseEvent) => event.preventDefault());
-  hoverMenuList.addEventListener("mouseenter", cancelHoverMenuClose);
-  hoverMenuList.addEventListener("mouseleave", scheduleHoverMenuClose);
-  for (const option of HOVER_MENU_OPTIONS) {
-    const item = el("button", { type: "button", class: "item", role: "menuitem" }, option);
-    item.addEventListener("click", (event: MouseEvent) => {
-      const h = ctx.hoverMenu;
-      if (!h || h.completed) return;
-      h.selectedOption = option;
-      h.selectedAt = performance.now();
-      h.trusted = event.isTrusted;
-      h.completed = option === h.expectedOption;
-      hoverMenuStatus.className = h.completed ? "status iframe-task-pass" : "status";
-      hoverMenuStatus.textContent = h.completed
-        ? `Step 7 done — selected "${option}".`
-        : `"${option}" is not the requested option. Hover again and choose "${h.expectedOption}".`;
-      closeHoverMenu();
-      if (h.completed) {
-        hoverMenuTrigger.textContent = `${option} selected`;
-        (hoverMenuTrigger as HTMLButtonElement).disabled = true;
-      }
+  const onHoverFrameMessage = (message: MessageEvent) => {
+    const data = parseHoverShadowMessage(message, {
+      challengeId: hoverChallengeId,
+      origin: hoverFrameUrl.origin,
+      source: hoverFrame.contentWindow,
+      options: HOVER_MENU_OPTIONS,
     });
-    hoverMenuList.append(item);
-  }
-  hoverMenuShadow.append(hoverMenuStyle, hoverMenuWrap);
-  const hoverMenuTask = el("div", { class: "hover-menu-task" }, hoverMenuStatus, hoverMenuHost);
+    if (!data) return;
+    const h = ctx.hoverMenu;
+    if (!h || h.completed) return;
+    if (data.event === "open") {
+      h.openedAt = performance.now();
+      h.hoverTrusted = data.isTrusted;
+      return;
+    }
+    h.selectedOption = data.selectedOption;
+    h.selectedAt = performance.now();
+    h.trusted = data.isTrusted;
+    h.completed = data.selectedOption === h.expectedOption;
+    hoverMenuStatus.className = h.completed ? "iframe-task-status iframe-task-pass" : "iframe-task-status";
+    hoverMenuStatus.textContent = h.completed
+      ? `Step 7 done — selected "${data.selectedOption}" through the iframe Shadow DOM.`
+      : `"${data.selectedOption}" is not the requested option. Hover again and choose "${h.expectedOption}".`;
+    if (!h.completed) {
+      h.openedAt = 0;
+      h.hoverTrusted = null;
+    }
+  };
+  window.addEventListener("message", onHoverFrameMessage);
 
   // ---- Step 8: native select must be changed through trusted input ----
   const expectedSelectValue = "wire";
@@ -1002,10 +981,10 @@ export function renderHome(root: HTMLElement) {
     window.removeEventListener("wheel", onWheel);
     window.removeEventListener("click", onClick);
     window.removeEventListener("message", onIframeMessage);
+    window.removeEventListener("message", onHoverFrameMessage);
     window.clearInterval(liveTimer);
     window.clearTimeout(keypadCloseTimer);
     window.clearTimeout(detachedSwapTimer);
-    window.clearTimeout(hoverMenuCloseTimer);
     popupChannel?.close();
     keypadOverlay.remove();
     submit.disabled = true;

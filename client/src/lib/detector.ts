@@ -90,6 +90,7 @@ export interface HoverMenuState {
   expectedOption: string;
   /** performance.now() when the menu became visible via a real mouseenter, 0 = never opened */
   openedAt: number;
+  hoverTrusted: boolean | null;
   selectedOption: string | null;
   selectedAt: number;
   trusted: boolean;

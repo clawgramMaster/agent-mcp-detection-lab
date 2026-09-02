@@ -37,7 +37,7 @@ One page, two independent scores, plus a report view (hash-routed):
     judged on HOW it acts: a **slider** drag, a reshuffling closed-shadow-DOM
     **security keypad**, exact generated credentials, a three-level certificate
     iframe with masked controlled input, a DOM-churn click, popup opener/referrer
-    integrity, a closed-shadow-DOM hover menu, a native select,
+    integrity, an iframe-embedded closed-shadow-DOM hover menu, a native select,
     and a trusted copy/paste transfer. Keystroke timing, motion, event trust, and
     hidden **honeypots** provide supporting evidence.
     Nothing done yet ⇒ verdict is **incomplete**, never a false "bot".

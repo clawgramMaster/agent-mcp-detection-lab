@@ -411,8 +411,8 @@ label {
   border-radius: var(--radius);
   background: var(--surface);
 }
-.hover-menu-task {
-  margin-bottom: 20px;
+.iframe-task-host.hover-shadow-frame {
+  height: 250px;
 }
 .clipboard-task {
   display: grid;
