@@ -224,8 +224,10 @@ export function renderHome(root: HTMLElement) {
   window.addEventListener("wheel", onWheel, { passive: true });
   window.addEventListener("click", onClick, { passive: true });
 
+  const randomInt = (upperBound: number) => crypto.getRandomValues(new Uint32Array(1))[0] % upperBound;
+
   // ---- Step 1: slider drag to a target ----
-  const sliderTarget = 60 + Math.floor(Math.random() * 25); // 60–84
+  const sliderTarget = 60 + randomInt(25); // 60–84
   ctx.slider = { target: sliderTarget, value: 0, samples: [], startedAt: 0, releasedAt: 0, completed: false };
   const sliderStatus = el("div", { class: "status" }, `Step 1 — drag the slider to exactly ${sliderTarget}.`);
   const sliderInput = el("input", {
@@ -277,7 +279,7 @@ export function renderHome(root: HTMLElement) {
   // layout RE-SHUFFLES after every click so on-screen coordinates can't be
   // cached across taps. The popup closes itself the moment the PIN is complete.
   const KEYPAD_PIN_LEN = 4;
-  const keypadPin: number[] = Array.from({ length: KEYPAD_PIN_LEN }, () => Math.floor(Math.random() * 10));
+  const keypadPin: number[] = Array.from({ length: KEYPAD_PIN_LEN }, () => randomInt(10));
   ctx.keypad = {
     pin: keypadPin,
     clicks: [],
@@ -393,7 +395,7 @@ export function renderHome(root: HTMLElement) {
     keypadGrid.innerHTML = "";
     const cells: (number | null)[] = [...Array.from({ length: 10 }, (_, i) => i), null, null];
     for (let i = cells.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = randomInt(i + 1);
       [cells[i], cells[j]] = [cells[j], cells[i]];
     }
     for (const digit of cells) {
@@ -645,7 +647,7 @@ export function renderHome(root: HTMLElement) {
       bonusBtn.replaceWith(replacement);
       bonusBtn = replacement;
     },
-    500 + Math.floor(Math.random() * 400),
+    500 + randomInt(400),
   );
 
   // ---- Step 6: popup window.opener / referrer integrity ----
@@ -704,8 +706,7 @@ export function renderHome(root: HTMLElement) {
   // inside a closed shadow root. Only postMessage telemetry from the expected
   // origin, frame window, and per-run challenge is accepted back here.
   const HOVER_MENU_OPTIONS = ["Card", "Bank transfer", "Kakao Pay"];
-  const expectedHoverOption =
-    HOVER_MENU_OPTIONS[crypto.getRandomValues(new Uint32Array(1))[0] % HOVER_MENU_OPTIONS.length];
+  const expectedHoverOption = HOVER_MENU_OPTIONS[randomInt(HOVER_MENU_OPTIONS.length)];
   const hoverChallengeId = crypto.randomUUID();
   ctx.hoverMenu = {
     options: HOVER_MENU_OPTIONS,
