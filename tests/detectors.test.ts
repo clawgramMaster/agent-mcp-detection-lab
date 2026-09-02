@@ -496,12 +496,17 @@ test("popup opener integrity: never clicked → inconclusive", () => {
 test("hover-menu: selected with zero dwell (no real hover) → fail", () => {
   const ctx = mkCtx({
     hoverMenu: {
+      challengeId: "hover-1",
       options: ["Card", "Bank transfer", "Kakao Pay"],
       expectedOption: "Card",
       openedAt: 0,
+      frameOpenedAt: 0,
+      openChallengeId: null,
       hoverTrusted: null,
       selectedOption: "Card",
       selectedAt: 100,
+      frameSelectedAt: 100,
+      selectChallengeId: "hover-1",
       trusted: true,
       completed: true,
     },
@@ -513,12 +518,17 @@ test("hover-menu: selected with zero dwell (no real hover) → fail", () => {
 test("hover-menu: superhuman dwell between open and pick → fail", () => {
   const ctx = mkCtx({
     hoverMenu: {
+      challengeId: "hover-1",
       options: ["Card", "Bank transfer", "Kakao Pay"],
       expectedOption: "Card",
       openedAt: 100,
+      frameOpenedAt: 100,
+      openChallengeId: "hover-1",
       hoverTrusted: true,
       selectedOption: "Card",
       selectedAt: 130, // 30ms — faster than perception + travel into the menu
+      frameSelectedAt: 130,
+      selectChallengeId: "hover-1",
       trusted: true,
       completed: true,
     },
@@ -530,12 +540,17 @@ test("hover-menu: superhuman dwell between open and pick → fail", () => {
 test("hover-menu: real hover dwell then a trusted pick → pass", () => {
   const ctx = mkCtx({
     hoverMenu: {
+      challengeId: "hover-1",
       options: ["Card", "Bank transfer", "Kakao Pay"],
       expectedOption: "Kakao Pay",
       openedAt: 100,
+      frameOpenedAt: 100,
+      openChallengeId: "hover-1",
       hoverTrusted: true,
       selectedOption: "Kakao Pay",
       selectedAt: 650,
+      frameSelectedAt: 650,
+      selectChallengeId: "hover-1",
       trusted: true,
       completed: true,
     },
@@ -547,18 +562,70 @@ test("hover-menu: real hover dwell then a trusted pick → pass", () => {
 test("hover-menu: synthetic iframe hover fails even with human-like dwell", () => {
   const ctx = mkCtx({
     hoverMenu: {
+      challengeId: "hover-1",
       options: ["Card", "Bank transfer", "Kakao Pay"],
       expectedOption: "Bank transfer",
       openedAt: 100,
+      frameOpenedAt: 100,
+      openChallengeId: "hover-1",
       hoverTrusted: false,
       selectedOption: "Bank transfer",
       selectedAt: 650,
+      frameSelectedAt: 650,
+      selectChallengeId: "hover-1",
       trusted: true,
       completed: true,
     },
   });
   const r = hoverMenuSelection.run(ctx) as { rating: string };
   assert.equal(r.rating, "fail");
+});
+
+test("hover-menu: forged child dwell disagrees with parent receipt timing → fail", () => {
+  const ctx = mkCtx({
+    hoverMenu: {
+      challengeId: "hover-1",
+      options: ["Card", "Bank transfer", "Kakao Pay"],
+      expectedOption: "Card",
+      openedAt: 100,
+      frameOpenedAt: 100,
+      openChallengeId: "hover-1",
+      hoverTrusted: true,
+      selectedOption: "Card",
+      selectedAt: 110,
+      frameSelectedAt: 650,
+      selectChallengeId: "hover-1",
+      trusted: true,
+      completed: true,
+    },
+  });
+  const r = hoverMenuSelection.run(ctx) as { rating: string };
+  assert.equal(r.rating, "fail");
+});
+
+test("hover-menu: replayed generation and non-increasing child timestamps → fail", () => {
+  const ctx = mkCtx({
+    hoverMenu: {
+      challengeId: "hover-current",
+      options: ["Card", "Bank transfer", "Kakao Pay"],
+      expectedOption: "Card",
+      openedAt: 100,
+      frameOpenedAt: 500,
+      openChallengeId: "hover-stale",
+      hoverTrusted: true,
+      selectedOption: "Card",
+      selectedAt: 650,
+      frameSelectedAt: 500,
+      selectChallengeId: "hover-stale",
+      trusted: true,
+      completed: true,
+    },
+  });
+  const r = hoverMenuSelection.run(ctx) as { evidence: Record<string, unknown>; rating: string };
+
+  assert.equal(r.rating, "fail");
+  assert.equal(r.evidence.challengeGenerationMismatch, true);
+  assert.equal(r.evidence.nonMonotonicFrameTimestamps, true);
 });
 
 test("hover-menu: not attempted → inconclusive", () => {
@@ -573,8 +640,13 @@ test("in-page hover-menu: selected without trusted hover → fail", () => {
         options: ["Card", "Bank transfer", "Kakao Pay"],
         expectedOption: "Card",
         openedAt: 0,
+        hoverStartX: 0,
+        hoverStartY: 0,
         selectedOption: "Card",
         selectedAt: 100,
+        mouseSamples: 0,
+        pathLength: 0,
+        targetGap: 0,
         trusted: true,
         completed: true,
       },
@@ -590,8 +662,13 @@ test("in-page hover-menu: zero dwell → fail", () => {
         options: ["Card", "Bank transfer", "Kakao Pay"],
         expectedOption: "Bank transfer",
         openedAt: 100,
+        hoverStartX: 100,
+        hoverStartY: 100,
         selectedOption: "Bank transfer",
         selectedAt: 100,
+        mouseSamples: 0,
+        pathLength: 0,
+        targetGap: 60,
         trusted: true,
         completed: true,
       },
@@ -607,8 +684,13 @@ test("in-page hover-menu: trusted hover dwell and click → pass", () => {
         options: ["Card", "Bank transfer", "Kakao Pay"],
         expectedOption: "Kakao Pay",
         openedAt: 100,
+        hoverStartX: 100,
+        hoverStartY: 100,
         selectedOption: "Kakao Pay",
         selectedAt: 650,
+        mouseSamples: 8,
+        pathLength: 92,
+        targetGap: 68,
         trusted: true,
         completed: true,
       },
@@ -624,14 +706,43 @@ test("in-page hover-menu: synthetic click with human-like dwell → fail", () =>
         options: ["Card", "Bank transfer", "Kakao Pay"],
         expectedOption: "Card",
         openedAt: 100,
+        hoverStartX: 100,
+        hoverStartY: 100,
         selectedOption: "Card",
         selectedAt: 650,
+        mouseSamples: 0,
+        pathLength: 0,
+        targetGap: 68,
         trusted: false,
         completed: true,
       },
     }),
   ) as { rating: string };
   assert.equal(r.rating, "fail");
+});
+
+test("in-page hover-menu: correct dwell with a cursor teleport scores worse than a normal trail", () => {
+  const base = {
+    options: ["Card", "Bank transfer", "Kakao Pay"],
+    expectedOption: "Card",
+    openedAt: 100,
+    hoverStartX: 100,
+    hoverStartY: 100,
+    selectedOption: "Card",
+    selectedAt: 650,
+    trusted: true,
+    completed: true,
+  };
+  const normal = inPageHoverMenuSelection.run(
+    mkCtx({ inPageHoverMenu: { ...base, mouseSamples: 9, pathLength: 88, targetGap: 64 } }),
+  ) as { rating: string; score: number };
+  const teleport = inPageHoverMenuSelection.run(
+    mkCtx({ inPageHoverMenu: { ...base, mouseSamples: 0, pathLength: 0, targetGap: 64 } }),
+  ) as { rating: string; score: number };
+
+  assert.equal(normal.rating, "pass");
+  assert.equal(teleport.rating, "fail");
+  assert.ok(teleport.score > normal.score);
 });
 
 test("in-page hover-menu: not attempted → inconclusive", () => {

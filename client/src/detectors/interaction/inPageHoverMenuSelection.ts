@@ -21,6 +21,9 @@ export const inPageHoverMenuSelection: Detector = {
     const evidence: Record<string, unknown> = {
       expectedOption: h.expectedOption,
       selectedOption: h.selectedOption,
+      mouseSamples: h.mouseSamples,
+      pathLength: Math.round(h.pathLength),
+      targetGap: Math.round(h.targetGap),
     };
     let score = 0;
 
@@ -36,6 +39,11 @@ export const inPageHoverMenuSelection: Detector = {
       evidence.dwellMs = Math.round(dwell);
       if (dwell < 80) score += 65;
       else if (dwell < 150) score += 30;
+
+      if (h.targetGap > 20 && (h.mouseSamples === 0 || h.pathLength < h.targetGap * 0.4)) {
+        evidence.cursorTeleport = true;
+        score += 60;
+      }
     }
 
     score = Math.min(100, score);

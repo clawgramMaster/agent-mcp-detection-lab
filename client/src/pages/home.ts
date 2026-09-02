@@ -706,7 +706,7 @@ export function renderHome(root: HTMLElement) {
     };
   }
 
-  // ---- Step 7: iframe + closed Shadow DOM hover menu ----
+  // ---- Step 8: iframe + closed Shadow DOM hover menu ----
   // The interaction surface crosses an iframe boundary, then hides its menu
   // inside a closed shadow root. Only postMessage telemetry from the expected
   // origin, frame window, and per-run challenge is accepted back here.
@@ -714,12 +714,17 @@ export function renderHome(root: HTMLElement) {
   const iframeExpectedHoverOption = HOVER_MENU_OPTIONS[randomInt(HOVER_MENU_OPTIONS.length)];
   const hoverChallengeId = crypto.randomUUID();
   ctx.hoverMenu = {
+    challengeId: hoverChallengeId,
     options: HOVER_MENU_OPTIONS,
     expectedOption: iframeExpectedHoverOption,
     openedAt: 0,
+    frameOpenedAt: 0,
+    openChallengeId: null,
     hoverTrusted: null,
     selectedOption: null,
     selectedAt: 0,
+    frameSelectedAt: 0,
+    selectChallengeId: null,
     trusted: false,
     completed: false,
   };
@@ -742,7 +747,7 @@ export function renderHome(root: HTMLElement) {
   const hoverMenuTask = el(
     "div",
     { class: "iframe-task" },
-    el("div", { class: "step2-label" }, "Step 7 — Iframe Shadow DOM hover menu"),
+    el("div", { class: "step2-label" }, "Step 8 — Iframe Shadow DOM hover menu"),
     hoverMenuStatus,
     hoverFrame,
   );
@@ -758,32 +763,45 @@ export function renderHome(root: HTMLElement) {
     if (!h || h.completed) return;
     if (data.event === "open") {
       h.openedAt = performance.now();
+      h.frameOpenedAt = data.timestamp;
+      h.openChallengeId = data.challengeId;
       h.hoverTrusted = data.isTrusted;
       return;
     }
     h.selectedOption = data.selectedOption;
     h.selectedAt = performance.now();
+    h.frameSelectedAt = data.timestamp;
+    h.selectChallengeId = data.challengeId;
     h.trusted = data.isTrusted;
     h.completed = data.selectedOption === h.expectedOption;
     hoverMenuStatus.className = h.completed ? "iframe-task-status iframe-task-pass" : "iframe-task-status";
     hoverMenuStatus.textContent = h.completed
-      ? `Step 7 done — selected "${data.selectedOption}" through the iframe Shadow DOM.`
+      ? `Step 8 done — selected "${data.selectedOption}" through the iframe Shadow DOM.`
       : `"${data.selectedOption}" is not the requested option. Hover again and choose "${h.expectedOption}".`;
     if (!h.completed) {
       h.openedAt = 0;
+      h.frameOpenedAt = 0;
+      h.openChallengeId = null;
       h.hoverTrusted = null;
+      h.frameSelectedAt = 0;
+      h.selectChallengeId = null;
     }
   };
   window.addEventListener("message", onHoverFrameMessage);
 
-  // ---- Step 8: in-page closed Shadow DOM hover menu ----
+  // ---- Step 7: in-page closed Shadow DOM hover menu ----
   const inPageExpectedHoverOption = HOVER_MENU_OPTIONS[randomInt(HOVER_MENU_OPTIONS.length)];
   ctx.inPageHoverMenu = {
     options: HOVER_MENU_OPTIONS,
     expectedOption: inPageExpectedHoverOption,
     openedAt: 0,
+    hoverStartX: 0,
+    hoverStartY: 0,
     selectedOption: null,
     selectedAt: 0,
+    mouseSamples: 0,
+    pathLength: 0,
+    targetGap: 0,
     trusted: false,
     completed: false,
   };
@@ -835,7 +853,14 @@ export function renderHome(root: HTMLElement) {
     cancelInPageHoverClose();
     const state = ctx.inPageHoverMenu;
     if (!state || state.completed || !event.isTrusted) return;
-    if (state.openedAt === 0) state.openedAt = performance.now();
+    if (state.openedAt === 0) {
+      state.openedAt = performance.now();
+      state.hoverStartX = event.clientX;
+      state.hoverStartY = event.clientY;
+      state.mouseSamples = 0;
+      state.pathLength = 0;
+      state.targetGap = 0;
+    }
     inPageHoverWrap.classList.add("open");
     inPageHoverTrigger.setAttribute("aria-expanded", "true");
   });
@@ -850,13 +875,24 @@ export function renderHome(root: HTMLElement) {
       if (!state || state.completed) return;
       state.selectedOption = option;
       state.selectedAt = performance.now();
+      const trail = ctx.mouse.filter((sample) => sample.t >= state.openedAt && sample.t <= state.selectedAt);
+      let previousX = state.hoverStartX;
+      let previousY = state.hoverStartY;
+      state.pathLength = 0;
+      for (const sample of trail) {
+        state.pathLength += Math.hypot(sample.x - previousX, sample.y - previousY);
+        previousX = sample.x;
+        previousY = sample.y;
+      }
+      state.mouseSamples = trail.length;
+      state.targetGap = Math.hypot(event.clientX - state.hoverStartX, event.clientY - state.hoverStartY);
       state.trusted = event.isTrusted;
       state.completed = option === state.expectedOption;
       inPageHoverStatus.className = state.completed
         ? "iframe-task-status iframe-task-pass"
         : "iframe-task-status";
       inPageHoverStatus.textContent = state.completed
-        ? `Step 8 done — selected "${option}" in the page Shadow DOM.`
+        ? `Step 7 done — selected "${option}" in the page Shadow DOM.`
         : `"${option}" is not the requested option. Hover again and choose "${state.expectedOption}".`;
       closeInPageHoverMenu();
       if (state.completed) {
@@ -870,7 +906,7 @@ export function renderHome(root: HTMLElement) {
   const inPageHoverTask = el(
     "div",
     { class: "iframe-task" },
-    el("div", { class: "step2-label" }, "Step 8 — In-page Shadow DOM hover menu"),
+    el("div", { class: "step2-label" }, "Step 7 — In-page Shadow DOM hover menu"),
     inPageHoverStatus,
     inPageHoverHost,
   );
@@ -1035,8 +1071,8 @@ export function renderHome(root: HTMLElement) {
       bonusClickRow,
       popupStatus,
       popupLink,
-      hoverMenuTask,
       inPageHoverTask,
+      hoverMenuTask,
       nativeSelectStatus,
       nativeSelectTask,
       clipboardTask,

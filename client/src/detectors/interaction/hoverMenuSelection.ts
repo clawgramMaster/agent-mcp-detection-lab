@@ -26,6 +26,8 @@ export const hoverMenuSelection: Detector = {
       expectedOption: h.expectedOption,
       selectedOption: h.selectedOption,
       hoverTrusted: h.hoverTrusted,
+      sameChallengeGeneration:
+        h.openChallengeId === h.challengeId && h.selectChallengeId === h.challengeId,
     };
     let score = 0;
 
@@ -35,6 +37,10 @@ export const hoverMenuSelection: Detector = {
     }
     if (!h.trusted) {
       ev.untrusted = true;
+      score += 65;
+    }
+    if (h.openChallengeId !== h.challengeId || h.selectChallengeId !== h.challengeId) {
+      ev.challengeGenerationMismatch = true;
       score += 65;
     }
     if (h.openedAt === 0) {
@@ -49,6 +55,28 @@ export const hoverMenuSelection: Detector = {
       if (dwell < 80)
         score += 65; // faster than perception + travel into the menu
       else if (dwell < 150) score += 30;
+
+      // Pointer coordinates stop at the iframe boundary. Compare elapsed time
+      // instead: live open/select messages should advance in the child clock
+      // and by roughly the same amount at parent receipt.
+      const frameDwell = h.frameSelectedAt - h.frameOpenedAt;
+      ev.frameDwellMs = Math.round(frameDwell);
+      if (frameDwell <= 0) {
+        ev.nonMonotonicFrameTimestamps = true;
+        score += 65;
+      } else {
+        const timingDelta = Math.abs(dwell - frameDwell);
+        const timingDeltaRatio = timingDelta / Math.max(dwell, frameDwell, 1);
+        ev.crossClockDeltaMs = Math.round(timingDelta);
+        ev.crossClockDeltaRatio = +timingDeltaRatio.toFixed(2);
+        if (timingDelta > 120 && timingDeltaRatio > 0.5) {
+          ev.crossClockMismatch = true;
+          score += 60;
+        } else if (timingDelta > 60 && timingDeltaRatio > 0.35) {
+          ev.crossClockMismatch = true;
+          score += 30;
+        }
+      }
     }
 
     score = Math.min(100, score);

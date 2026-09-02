@@ -88,13 +88,21 @@ export interface ClipboardTransferState {
  * fires a click has no such dwell/travel time at all.
  */
 export interface HoverMenuState {
+  challengeId: string;
   options: string[];
   expectedOption: string;
-  /** performance.now() when the menu became visible via a real mouseenter, 0 = never opened */
+  /** Parent performance.now() when the open message arrived, 0 = never opened. */
   openedAt: number;
+  /** Iframe performance.now() reported by the open message, 0 = never opened. */
+  frameOpenedAt: number;
+  openChallengeId: string | null;
   hoverTrusted: boolean | null;
   selectedOption: string | null;
+  /** Parent performance.now() when the select message arrived. */
   selectedAt: number;
+  /** Iframe performance.now() reported by the select message. */
+  frameSelectedAt: number;
+  selectChallengeId: string | null;
   trusted: boolean;
   completed: boolean;
 }
@@ -104,8 +112,16 @@ export interface InPageHoverMenuState {
   expectedOption: string;
   /** performance.now() when a trusted mouseenter opened the menu, 0 = never opened */
   openedAt: number;
+  hoverStartX: number;
+  hoverStartY: number;
   selectedOption: string | null;
   selectedAt: number;
+  /** Global mousemove samples observed after trigger entry and before selection. */
+  mouseSamples: number;
+  /** Cursor path length over those samples, starting at the trigger-entry point. */
+  pathLength: number;
+  /** Straight-line cursor displacement from trigger entry to option click. */
+  targetGap: number;
   trusted: boolean;
   completed: boolean;
 }
