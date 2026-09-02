@@ -16,6 +16,11 @@ import { shiftKeyConsistency } from "../client/src/detectors/interaction/shiftKe
 import { sliderDrag } from "../client/src/detectors/interaction/sliderDrag";
 import { clipboardShortcutMismatch, pasteVsType } from "../client/src/detectors/interaction/typing";
 import { evaluateChromeShimFidelity } from "../client/src/detectors/static/chromeShimFidelity";
+import { evaluateConsoleTiming } from "../client/src/detectors/static/cdpConsoleTiming";
+import {
+  evaluateRuntimeBindingCandidates,
+  type RuntimeBindingCandidate,
+} from "../client/src/detectors/static/runtimeBindingLeak";
 import { shadowDomIntegrity } from "../client/src/detectors/static/shadowDom";
 import type { DetectorCtx, KeySample, MouseSample } from "../client/src/lib/detector";
 import {
@@ -101,6 +106,65 @@ const loadTimesShape = {
   wasAlternateProtocolAvailable: false,
   connectionInfo: "h2",
 };
+
+const runtimeBinding = (over: Partial<RuntimeBindingCandidate> = {}): RuntimeBindingCandidate => ({
+  property: "qjvpkxmsdlat",
+  source: "function () { [native code] }",
+  functionName: "",
+  functionLength: 0,
+  configurable: true,
+  enumerable: true,
+  writable: true,
+  ...over,
+});
+
+test("anonymous mutable native global with a Rebrowser random name fails Runtime binding detection", () => {
+  const r = evaluateRuntimeBindingCandidates([runtimeBinding()]);
+  assert.equal(r.rating, "fail");
+  assert.equal(r.score, 85);
+});
+
+test("ordinary named native and application globals pass Runtime binding detection", () => {
+  const r = evaluateRuntimeBindingCandidates([
+    runtimeBinding({ property: "open", functionName: "open", enumerable: false }),
+    runtimeBinding({ property: "applicationState", source: "function applicationState() {}" }),
+  ]);
+  assert.equal(r.rating, "pass");
+  assert.equal(r.score, 0);
+});
+
+test("near-miss Runtime binding descriptors do not false-positive", () => {
+  const r = evaluateRuntimeBindingCandidates([runtimeBinding({ enumerable: false })]);
+  assert.equal(r.rating, "pass");
+});
+
+test("unavailable window property scan is inconclusive for Runtime binding detection", () => {
+  const r = evaluateRuntimeBindingCandidates(null);
+  assert.equal(r.rating, "inconclusive");
+  assert.equal(r.score, 0);
+});
+
+test("large object-to-primitive console cost is a low-confidence CDP warning", () => {
+  const r = evaluateConsoleTiming(Array.from({ length: 7 }, () => ({ primitiveMs: 0.8, objectMs: 2.4 })));
+  assert.equal(r.rating, "warn");
+  assert.equal(r.score, 25);
+});
+
+test("similar object and primitive console costs pass CDP timing", () => {
+  const r = evaluateConsoleTiming(Array.from({ length: 7 }, () => ({ primitiveMs: 0.7, objectMs: 0.8 })));
+  assert.equal(r.rating, "pass");
+  assert.equal(r.score, 0);
+});
+
+test("coarse or invalid console timing is inconclusive", () => {
+  const r = evaluateConsoleTiming([
+    { primitiveMs: 0, objectMs: 0 },
+    { primitiveMs: Number.NaN, objectMs: 2 },
+    { primitiveMs: 0.8, objectMs: 2.4 },
+  ]);
+  assert.equal(r.rating, "inconclusive");
+  assert.equal(r.score, 0);
+});
 
 test("sparse chrome.runtime shim missing native enum objects fails fidelity", () => {
   const r = evaluateChromeShimFidelity({

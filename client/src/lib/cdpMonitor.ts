@@ -1,26 +1,28 @@
 import type { TestResult } from "../../../shared/types";
 import { automationGlobals } from "../detectors/static/automationGlobals";
 import { exposeFunctionLeak } from "../detectors/static/exposeFunctionLeak";
+import { runtimeBindingLeak } from "../detectors/static/runtimeBindingLeak";
 import { webdriver } from "../detectors/static/webdriver";
 import { type DetectorCtx, result } from "./detector";
 
 /**
  * Temporal CDP monitor.
  *
- * A one-shot page-load scan misses the whole class of automation that only
- * enables CDP domains WHEN it acts: an MCP / Puppeteer / Playwright agent calls
- * `evaluate`, `console_messages`, `network_requests`, `snapshot`, `screenshot`
- * AFTER landing, and only then does Runtime.enable / Console.enable light up.
+ * A one-shot page-load scan misses automation that installs framework globals
+ * or Runtime bindings only when it acts. Re-scan the cheap deterministic
+ * surfaces so those late traces are still observed.
  *
- * This monitor runs continuously and re-emits three signals into their EXISTING
+ * This monitor runs continuously and re-emits four signals into their EXISTING
  * test ids (so the weighted noisy-OR still counts each once, worst-ever):
- *   - cdpRuntimeLeak    — console-arg serialization via an Error.stack getter
- *                         trap; fires the moment Runtime/Console.enable turns on;
+ *   - cdpRuntimeLeak    — legacy console-arg Error.stack getter trap; positive
+ *                         hits remain useful, while current V8 misses are inconclusive;
  *   - automationGlobals — late-injected framework globals;
- *   - exposeFunctionLeak — bindings installed mid-session via exposeFunction.
+ *   - exposeFunctionLeak — bindings installed mid-session via exposeFunction;
+ *   - runtimeBindingLeak — anonymous native globals installed via
+ *                          Runtime.addBinding by Runtime.enable-avoidance modes.
  *
- * For a human (who never drives CDP) every tick stays green forever; for an agent
- * the Passive score flips red the instant it touches the page programmatically.
+ * Clean sessions remain non-failing; observable late artifacts upgrade their
+ * existing result row without counting the same evidence twice.
  */
 const EMPTY_CTX: DetectorCtx = {
   mouse: [],
@@ -36,7 +38,7 @@ const EMPTY_CTX: DetectorCtx = {
   maxValueJump: 0,
 };
 
-const RESCAN = [webdriver, automationGlobals, exposeFunctionLeak];
+const RESCAN = [webdriver, automationGlobals, exposeFunctionLeak, runtimeBindingLeak];
 
 export interface CdpMonitorHandle {
   stop: () => void;
@@ -76,7 +78,14 @@ export function startCdpMonitor(emit: (r: TestResult) => void, intervalMs = 700)
             "CDP Runtime.enable leak",
             "static",
           )
-        : result("cdpRuntimeLeak", "pass", 0, { leaked: false, live: true }, "CDP Runtime.enable leak", "static"),
+        : result(
+            "cdpRuntimeLeak",
+            "inconclusive",
+            0,
+            { leaked: false, live: true, reason: "Error preview getters are guarded by current V8" },
+            "CDP Runtime.enable leak",
+            "static",
+          ),
     );
 
     // Re-scan cheap synchronous surfaces for late injection.

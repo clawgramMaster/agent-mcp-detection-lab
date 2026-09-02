@@ -121,6 +121,10 @@ export const EVIDENCE_GROUPS: Record<string, string> = {
   engineCoherence: "ua-consistency",
   headlessSignals: "ua-consistency",
   chromeShimFidelity: "ua-consistency",
+  // CDP Runtime instrumentation family
+  cdpRuntimeLeak: "cdp-runtime",
+  runtimeBindingLeak: "cdp-runtime",
+  cdpConsoleTiming: "cdp-runtime",
 };
 
 export const DETECTOR_WEIGHTS: Record<string, number> = {
@@ -137,6 +141,7 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   nativeSelect: 1,
   // --- strong heuristics ---
   cdpStackTrace: 0.9, // injected-script sourceURL markers
+  runtimeBindingLeak: 0.9, // Runtime.addBinding's anonymous mutable native global
   nativeToString: 0.8, // patched native fn (rare benign extensions exist → not "hard")
   shadowDomIntegrity: 0.85, // patched attachShadow / leaked closed shadow root
   cdpMouseLeak: 0.6,
@@ -183,6 +188,7 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   speechVoices: 0,
   webrtcLeak: 0,
   batteryApi: 0,
+  cdpConsoleTiming: 0, // human-opened DevTools activates the same serialization path
 };
 
 export interface AggregateResult {

@@ -23,6 +23,7 @@ import { automationGlobals } from "./static/automationGlobals";
 import { batteryApi } from "./static/batteryApi";
 import { canvasRender } from "./static/canvasRender";
 import { cdpRuntimeLeak, cdpStackTrace } from "./static/cdp";
+import { cdpConsoleTiming } from "./static/cdpConsoleTiming";
 import { clientHints } from "./static/clientHints";
 import { chromeShimFidelity } from "./static/chromeShimFidelity";
 import { cspBypass } from "./static/cspBypass";
@@ -40,6 +41,7 @@ import { mediaCodecs } from "./static/mediaCodecs";
 import { nativeToString } from "./static/nativeToString";
 import { permissionsMismatch } from "./static/permissions";
 import { pointerCapabilities } from "./static/pointerCapabilities";
+import { runtimeBindingLeak } from "./static/runtimeBindingLeak";
 import { screenAnomalies } from "./static/screenAnomalies";
 import { shadowDomIntegrity } from "./static/shadowDom";
 import { speechVoices } from "./static/speechVoices";
@@ -54,6 +56,8 @@ export const staticDetectors: Detector[] = [
   automationGlobals,
   cdpRuntimeLeak,
   cdpStackTrace,
+  runtimeBindingLeak,
+  cdpConsoleTiming,
   cspBypass,
   nativeToString,
   exposeFunctionLeak,

@@ -24,13 +24,15 @@ Detection principles are re-implemented from public research
 One page, two independent scores, plus a report view (hash-routed):
 
 - **`#lab`** — the detector page.
-  - **Passive score** — runs the moment you land: `webdriver`, CDP `Runtime.enable`
-    leak, injection stack artifacts, native-fn and Chrome-shim fidelity,
+  - **Passive score** — runs the moment you land: `webdriver`, legacy CDP
+    `Runtime.enable` leak, CDP binding/timing signals, injection stack artifacts,
+    native-fn and Chrome-shim fidelity,
     exposeFunction bindings, Electron/Node surface, headless signals,
     UA↔engine coherence, permissions,
     WebGL software renderer, iframe/worker consistency, media codecs, server-side
-    HTTP-header & TLS checks. A **temporal CDP monitor** keeps watching, so a runner
-    that enables CDP *after* load (calling evaluate/console/snapshot) flips the score
+    HTTP-header & TLS checks. A **temporal CDP monitor** keeps watching for late
+    framework globals, bindings, and legacy Runtime getter hits, so traces added
+    after load can still flip the score
     live. Informational fingerprint surfaces (canvas, audio, fonts, battery, …) are
     shown but do not affect the verdict.
   - **Behavioral score** — a ten-step *active challenge* the agent must perform,

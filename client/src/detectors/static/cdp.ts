@@ -1,10 +1,14 @@
 import { type Detector, result } from "../../lib/detector";
 
 /**
- * CDP Runtime.enable leak (Rebrowser technique).
+ * Legacy CDP Runtime.enable leak (Rebrowser technique).
  * When a controller calls Runtime.enable, the DevTools protocol serializes
  * every thrown Error's `stack` getter. We throw an Error and access .stack
  * inside a getter to see if it is being read out-of-band.
+ *
+ * V8 stopped invoking user-defined Error preview getters in May 2025. A getter
+ * hit remains decisive on affected builds, but a miss is inconclusive rather
+ * than proof that Runtime is disabled.
  */
 export const cdpRuntimeLeak: Detector = {
   test: "cdpRuntimeLeak",
@@ -28,7 +32,14 @@ export const cdpRuntimeLeak: Detector = {
         resolve(
           leaked
             ? result("cdpRuntimeLeak", "fail", 90, { leaked: true, method: "stack-getter" }, undefined, "static")
-            : result("cdpRuntimeLeak", "pass", 0, { leaked: false }, undefined, "static"),
+            : result(
+                "cdpRuntimeLeak",
+                "inconclusive",
+                0,
+                { leaked: false, reason: "Error preview getters are guarded by current V8" },
+                undefined,
+                "static",
+              ),
         );
       }, 60);
     }),

@@ -50,6 +50,18 @@ test("a hard-rule fail floors the score at ≥95 (decisive)", () => {
   assert.equal(a.verdict, "fail");
 });
 
+test("Runtime.addBinding leak contributes strongly without becoming a hard-rule floor", () => {
+  const a = aggregate([r("runtimeBindingLeak", "fail", 85)]);
+  assert.equal(a.botScore, 77);
+  assert.equal(a.verdict, "fail");
+});
+
+test("console serialization timing remains informational", () => {
+  const a = aggregate([r("cdpConsoleTiming", "warn", 25)]);
+  assert.equal(a.botScore, 0);
+  assert.equal(a.contributing, 0);
+});
+
 test("honeypot alone is decisive", () => {
   const a = aggregate([r("honeypot", "fail", 100)]);
   assert.ok(a.botScore >= 95);
