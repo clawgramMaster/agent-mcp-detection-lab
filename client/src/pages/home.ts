@@ -204,11 +204,16 @@ export function renderHome(root: HTMLElement) {
       movementY: e.movementY,
       isTrusted: e.isTrusted,
     };
-    // Outside a closed shadow root, keypad clicks are retargeted to the host.
-    // Its center is unrelated to the internal digit; keypad telemetry records
-    // the real button offset in its own handler below.
+    // Outside a closed shadow root, clicks are retargeted to the host. Its
+    // center is unrelated to the internal control; each shadow challenge
+    // records its meaningful interaction in a dedicated handler.
     const tgt = e.target as Element | null;
-    if (tgt && !tgt.classList.contains("keypad-host") && typeof tgt.getBoundingClientRect === "function") {
+    if (
+      tgt &&
+      !tgt.classList.contains("keypad-host") &&
+      !tgt.classList.contains("in-page-hover-menu-host") &&
+      typeof tgt.getBoundingClientRect === "function"
+    ) {
       const r = tgt.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) {
         s.centerDx = e.clientX - (r.left + r.width / 2);
@@ -497,7 +502,7 @@ export function renderHome(root: HTMLElement) {
   window.addEventListener("message", onIframeMessage);
 
   // ---- Step 3: credentials must match a specific, freshly generated value ----
-  // Mirrors the Step 4 (phone digits) / Step 8 (select value) pattern: a random
+  // Mirrors the Step 4 (phone digits) / Step 9 (select value) pattern: a random
   // target is generated and shown on screen, and only typing it EXACTLY counts —
   // "type anything" would let a bot autofill/paste a fixed string and pass.
   const PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -706,11 +711,11 @@ export function renderHome(root: HTMLElement) {
   // inside a closed shadow root. Only postMessage telemetry from the expected
   // origin, frame window, and per-run challenge is accepted back here.
   const HOVER_MENU_OPTIONS = ["Card", "Bank transfer", "Kakao Pay"];
-  const expectedHoverOption = HOVER_MENU_OPTIONS[randomInt(HOVER_MENU_OPTIONS.length)];
+  const iframeExpectedHoverOption = HOVER_MENU_OPTIONS[randomInt(HOVER_MENU_OPTIONS.length)];
   const hoverChallengeId = crypto.randomUUID();
   ctx.hoverMenu = {
     options: HOVER_MENU_OPTIONS,
-    expectedOption: expectedHoverOption,
+    expectedOption: iframeExpectedHoverOption,
     openedAt: 0,
     hoverTrusted: null,
     selectedOption: null,
@@ -721,12 +726,12 @@ export function renderHome(root: HTMLElement) {
   const hoverMenuStatus = el(
     "div",
     { class: "iframe-task-status" },
-    `Hover inside the frame and choose “${expectedHoverOption}” from the Shadow DOM menu.`,
+    `Hover inside the frame and choose “${iframeExpectedHoverOption}” from the Shadow DOM menu.`,
   );
   const hoverFrameUrl = new URL("/iframe-lab/hover-shadow.html", iframeOrigin ?? location.origin);
   hoverFrameUrl.search = new URLSearchParams({
     challengeId: hoverChallengeId,
-    expectedOption: expectedHoverOption,
+    expectedOption: iframeExpectedHoverOption,
     parentOrigin: location.origin,
   }).toString();
   const hoverFrame = el("iframe", {
@@ -771,7 +776,106 @@ export function renderHome(root: HTMLElement) {
   };
   window.addEventListener("message", onHoverFrameMessage);
 
-  // ---- Step 8: native select must be changed through trusted input ----
+  // ---- Step 8: in-page closed Shadow DOM hover menu ----
+  const inPageExpectedHoverOption = HOVER_MENU_OPTIONS[randomInt(HOVER_MENU_OPTIONS.length)];
+  ctx.inPageHoverMenu = {
+    options: HOVER_MENU_OPTIONS,
+    expectedOption: inPageExpectedHoverOption,
+    openedAt: 0,
+    selectedOption: null,
+    selectedAt: 0,
+    trusted: false,
+    completed: false,
+  };
+  const inPageHoverStatus = el(
+    "div",
+    { class: "iframe-task-status" },
+    `Hover over “Payment method” and choose “${inPageExpectedHoverOption}” (opens on hover, not on click).`,
+  );
+  const inPageHoverHost = el("div", { class: "in-page-hover-menu-host" });
+  const inPageHoverShadow = inPageHoverHost.attachShadow({ mode: "closed" });
+  const inPageHoverStyle = el(
+    "style",
+    {},
+    `
+      .wrap { position: relative; display: inline-block; min-width: 210px; padding-bottom: 125px; }
+      .trigger { width: 210px; padding: 11px 14px; border: 1px solid var(--line-strong, #d8d2c5); border-radius: 8px; background: var(--surface, white); color: var(--ink, #1b1915); font: 600 14px system-ui, sans-serif; text-align: left; cursor: default; }
+      .trigger:focus-visible { outline: 2px solid var(--pass, #3f7d54); outline-offset: 2px; }
+      .menu { display: none; position: absolute; top: 46px; left: 0; box-sizing: border-box; width: 210px; padding: 6px; border: 1px solid var(--line-strong, #d8d2c5); border-radius: 8px; background: var(--surface, white); box-shadow: 0 8px 20px rgba(27, 25, 21, .16); }
+      .open .menu { display: block; }
+      .item { display: block; width: 100%; padding: 8px 10px; border: 0; border-radius: 5px; background: transparent; color: var(--ink, #1b1915); font: 13px system-ui, sans-serif; text-align: left; cursor: pointer; }
+      .item:hover, .item:focus-visible { background: var(--pass-bg, #e8efe6); outline: none; }
+    `,
+  );
+  const inPageHoverTrigger = el(
+    "button",
+    { type: "button", class: "trigger", "aria-haspopup": "menu", "aria-expanded": "false" },
+    "Payment method ▾",
+  ) as HTMLButtonElement;
+  const inPageHoverList = el("div", { class: "menu", role: "menu" });
+  const inPageHoverWrap = el("div", { class: "wrap" }, inPageHoverTrigger, inPageHoverList);
+  let inPageHoverCloseTimer = 0;
+  const cancelInPageHoverClose = () => {
+    if (inPageHoverCloseTimer) window.clearTimeout(inPageHoverCloseTimer);
+    inPageHoverCloseTimer = 0;
+  };
+  const closeInPageHoverMenu = () => {
+    cancelInPageHoverClose();
+    inPageHoverWrap.classList.remove("open");
+    inPageHoverTrigger.setAttribute("aria-expanded", "false");
+    const state = ctx.inPageHoverMenu;
+    if (state && !state.completed) state.openedAt = 0;
+  };
+  const scheduleInPageHoverClose = () => {
+    cancelInPageHoverClose();
+    if (ctx.inPageHoverMenu?.completed) return;
+    inPageHoverCloseTimer = window.setTimeout(closeInPageHoverMenu, 180);
+  };
+  inPageHoverTrigger.addEventListener("mouseenter", (event: MouseEvent) => {
+    cancelInPageHoverClose();
+    const state = ctx.inPageHoverMenu;
+    if (!state || state.completed || !event.isTrusted) return;
+    if (state.openedAt === 0) state.openedAt = performance.now();
+    inPageHoverWrap.classList.add("open");
+    inPageHoverTrigger.setAttribute("aria-expanded", "true");
+  });
+  inPageHoverTrigger.addEventListener("mouseleave", scheduleInPageHoverClose);
+  inPageHoverTrigger.addEventListener("click", (event: MouseEvent) => event.preventDefault());
+  inPageHoverList.addEventListener("mouseenter", cancelInPageHoverClose);
+  inPageHoverList.addEventListener("mouseleave", scheduleInPageHoverClose);
+  for (const option of HOVER_MENU_OPTIONS) {
+    const item = el("button", { type: "button", class: "item", role: "menuitem" }, option);
+    item.addEventListener("click", (event: MouseEvent) => {
+      const state = ctx.inPageHoverMenu;
+      if (!state || state.completed) return;
+      state.selectedOption = option;
+      state.selectedAt = performance.now();
+      state.trusted = event.isTrusted;
+      state.completed = option === state.expectedOption;
+      inPageHoverStatus.className = state.completed
+        ? "iframe-task-status iframe-task-pass"
+        : "iframe-task-status";
+      inPageHoverStatus.textContent = state.completed
+        ? `Step 8 done — selected "${option}" in the page Shadow DOM.`
+        : `"${option}" is not the requested option. Hover again and choose "${state.expectedOption}".`;
+      closeInPageHoverMenu();
+      if (state.completed) {
+        inPageHoverTrigger.textContent = `${option} selected`;
+        inPageHoverTrigger.disabled = true;
+      }
+    });
+    inPageHoverList.append(item);
+  }
+  inPageHoverShadow.append(inPageHoverStyle, inPageHoverWrap);
+  const inPageHoverTask = el(
+    "div",
+    { class: "iframe-task" },
+    el("div", { class: "step2-label" }, "Step 8 — In-page Shadow DOM hover menu"),
+    inPageHoverStatus,
+    inPageHoverHost,
+  );
+
+  // ---- Step 9: native select must be changed through trusted input ----
   const expectedSelectValue = "wire";
   ctx.nativeSelect = {
     expectedValue: expectedSelectValue,
@@ -784,7 +888,7 @@ export function renderHome(root: HTMLElement) {
   const nativeSelectStatus = el(
     "div",
     { class: "status", id: "nativeSelectStatus" },
-    "Step 8 — choose “Wire transfer” from the native Settlement method dropdown.",
+    "Step 9 — choose “Wire transfer” from the native Settlement method dropdown.",
   );
   const nativeSelect = el("select", {
     id: "trustedSelect",
@@ -810,13 +914,13 @@ export function renderHome(root: HTMLElement) {
     if (event.type === "change") state.changeTrusted = event.isTrusted;
     state.complete = state.value === state.expectedValue;
     nativeSelectStatus.className = state.complete ? "status iframe-task-pass" : "status";
-    nativeSelectStatus.textContent = `Step 8 — value=${state.value || "empty"} · input trusted=${String(state.inputTrusted)} · change trusted=${String(state.changeTrusted)}`;
+    nativeSelectStatus.textContent = `Step 9 — value=${state.value || "empty"} · input trusted=${String(state.inputTrusted)} · change trusted=${String(state.changeTrusted)}`;
   };
   nativeSelect.addEventListener("input", onNativeSelect);
   nativeSelect.addEventListener("change", onNativeSelect);
-  const nativeSelectTask = el("label", { class: "step2-label" }, "Step 8 — Native settlement method", nativeSelect);
+  const nativeSelectTask = el("label", { class: "step2-label" }, "Step 9 — Native settlement method", nativeSelect);
 
-  // ---- Step 9: explicit trusted copy/paste transfer ----
+  // ---- Step 10: explicit trusted copy/paste transfer ----
   const clipboardToken = `CLIP-${randomChars(12, PASSWORD_CHARS)}`;
   ctx.clipboardTransfer = {
     expectedText: clipboardToken,
@@ -836,7 +940,7 @@ export function renderHome(root: HTMLElement) {
   const clipboardStatus = el(
     "div",
     { class: "status" },
-    "Step 9 — copy the token from the source field, then paste it into the destination field.",
+    "Step 10 — copy the token from the source field, then paste it into the destination field.",
   );
   const clipboardSource = el("input", {
     type: "text",
@@ -869,8 +973,8 @@ export function renderHome(root: HTMLElement) {
       state.value === state.expectedText;
     clipboardStatus.className = state.completed ? "status iframe-task-pass" : "status";
     clipboardStatus.textContent = state.completed
-      ? "Step 9 done — trusted copy and paste matched the token."
-      : "Step 9 — copy the token from the source field, then paste it into the destination field.";
+      ? "Step 10 done — trusted copy and paste matched the token."
+      : "Step 10 — copy the token from the source field, then paste it into the destination field.";
     return state.completed;
   };
   clipboardSource.addEventListener("focus", () => clipboardSource.select());
@@ -913,7 +1017,7 @@ export function renderHome(root: HTMLElement) {
   const interStatus = el(
     "div",
     { class: "status" },
-    "Challenge: complete all nine steps, then press Verify. We score motion, timing, trusted keyboard and clipboard delivery, controlled iframe state, and invisible honeypot access.",
+    "Challenge: complete all ten steps, then press Verify. We score motion, timing, trusted keyboard and clipboard delivery, controlled iframe state, and invisible honeypot access.",
   );
   root.append(
     section(
@@ -932,6 +1036,7 @@ export function renderHome(root: HTMLElement) {
       popupStatus,
       popupLink,
       hoverMenuTask,
+      inPageHoverTask,
       nativeSelectStatus,
       nativeSelectTask,
       clipboardTask,
@@ -946,7 +1051,7 @@ export function renderHome(root: HTMLElement) {
 
   // live: show CHALLENGE PROGRESS, not a score. A behavioral verdict before the
   // task is finished is confusing — the number only appears once you press Verify.
-  const REQUIRED_STEPS = 9;
+  const REQUIRED_STEPS = 10;
   const liveTimer = window.setInterval(() => {
     const done =
       (ctx.slider?.completed ? 1 : 0) +
@@ -956,6 +1061,7 @@ export function renderHome(root: HTMLElement) {
       (ctx.detachedClick?.completed ? 1 : 0) +
       (ctx.popupCheck?.completed ? 1 : 0) +
       (ctx.hoverMenu?.completed ? 1 : 0) +
+      (ctx.inPageHoverMenu?.completed ? 1 : 0) +
       (ctx.nativeSelect?.complete ? 1 : 0) +
       (ctx.clipboardTransfer?.completed ? 1 : 0);
     bNum.textContent = "—";
@@ -985,6 +1091,7 @@ export function renderHome(root: HTMLElement) {
     window.clearInterval(liveTimer);
     window.clearTimeout(keypadCloseTimer);
     window.clearTimeout(detachedSwapTimer);
+    window.clearTimeout(inPageHoverCloseTimer);
     popupChannel?.close();
     keypadOverlay.remove();
     submit.disabled = true;

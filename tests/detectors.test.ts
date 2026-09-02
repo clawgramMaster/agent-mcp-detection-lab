@@ -6,6 +6,7 @@ import { detachedNodeClick } from "../client/src/detectors/interaction/detachedN
 import { exactCenterClick } from "../client/src/detectors/interaction/exactCenterClick";
 import { honeypot } from "../client/src/detectors/interaction/honeypot";
 import { hoverMenuSelection } from "../client/src/detectors/interaction/hoverMenuSelection";
+import { inPageHoverMenuSelection } from "../client/src/detectors/interaction/inPageHoverMenuSelection";
 import { iframeControlledInput } from "../client/src/detectors/interaction/iframeControlledInput";
 import { keypadChallenge } from "../client/src/detectors/interaction/keypadChallenge";
 import { mouseEntropy } from "../client/src/detectors/interaction/mouse";
@@ -562,6 +563,79 @@ test("hover-menu: synthetic iframe hover fails even with human-like dwell", () =
 
 test("hover-menu: not attempted → inconclusive", () => {
   const r = hoverMenuSelection.run(mkCtx()) as { rating: string };
+  assert.equal(r.rating, "inconclusive");
+});
+
+test("in-page hover-menu: selected without trusted hover → fail", () => {
+  const r = inPageHoverMenuSelection.run(
+    mkCtx({
+      inPageHoverMenu: {
+        options: ["Card", "Bank transfer", "Kakao Pay"],
+        expectedOption: "Card",
+        openedAt: 0,
+        selectedOption: "Card",
+        selectedAt: 100,
+        trusted: true,
+        completed: true,
+      },
+    }),
+  ) as { rating: string };
+  assert.equal(r.rating, "fail");
+});
+
+test("in-page hover-menu: zero dwell → fail", () => {
+  const r = inPageHoverMenuSelection.run(
+    mkCtx({
+      inPageHoverMenu: {
+        options: ["Card", "Bank transfer", "Kakao Pay"],
+        expectedOption: "Bank transfer",
+        openedAt: 100,
+        selectedOption: "Bank transfer",
+        selectedAt: 100,
+        trusted: true,
+        completed: true,
+      },
+    }),
+  ) as { rating: string };
+  assert.equal(r.rating, "fail");
+});
+
+test("in-page hover-menu: trusted hover dwell and click → pass", () => {
+  const r = inPageHoverMenuSelection.run(
+    mkCtx({
+      inPageHoverMenu: {
+        options: ["Card", "Bank transfer", "Kakao Pay"],
+        expectedOption: "Kakao Pay",
+        openedAt: 100,
+        selectedOption: "Kakao Pay",
+        selectedAt: 650,
+        trusted: true,
+        completed: true,
+      },
+    }),
+  ) as { rating: string };
+  assert.equal(r.rating, "pass");
+});
+
+test("in-page hover-menu: synthetic click with human-like dwell → fail", () => {
+  const r = inPageHoverMenuSelection.run(
+    mkCtx({
+      inPageHoverMenu: {
+        options: ["Card", "Bank transfer", "Kakao Pay"],
+        expectedOption: "Card",
+        openedAt: 100,
+        selectedOption: "Card",
+        selectedAt: 650,
+        trusted: false,
+        completed: true,
+      },
+    }),
+  ) as { rating: string };
+  assert.equal(r.rating, "fail");
+});
+
+test("in-page hover-menu: not attempted → inconclusive", () => {
+  const r = inPageHoverMenuSelection.run(mkCtx()) as { rating: string };
   assert.equal(r.rating, "inconclusive");
 });
 

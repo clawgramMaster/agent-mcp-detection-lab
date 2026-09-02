@@ -41,6 +41,8 @@ export interface DetectorCtx {
   popupCheck?: PopupCheckState;
   /** hover-to-reveal dropdown menu selection telemetry */
   hoverMenu?: HoverMenuState;
+  /** in-page closed-shadow hover menu selection telemetry */
+  inPageHoverMenu?: InPageHoverMenuState;
   /** username/password must match a freshly generated value, not just be non-empty */
   credentials?: CredentialsState;
   /** explicit copy/paste transfer task telemetry */
@@ -91,6 +93,17 @@ export interface HoverMenuState {
   /** performance.now() when the menu became visible via a real mouseenter, 0 = never opened */
   openedAt: number;
   hoverTrusted: boolean | null;
+  selectedOption: string | null;
+  selectedAt: number;
+  trusted: boolean;
+  completed: boolean;
+}
+
+export interface InPageHoverMenuState {
+  options: string[];
+  expectedOption: string;
+  /** performance.now() when a trusted mouseenter opened the menu, 0 = never opened */
+  openedAt: number;
   selectedOption: string | null;
   selectedAt: number;
   trusted: boolean;

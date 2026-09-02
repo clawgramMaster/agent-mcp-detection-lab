@@ -5,6 +5,7 @@ import { detachedNodeClick } from "./interaction/detachedNodeClick";
 import { exactCenterClick } from "./interaction/exactCenterClick";
 import { honeypot } from "./interaction/honeypot";
 import { hoverMenuSelection } from "./interaction/hoverMenuSelection";
+import { inPageHoverMenuSelection } from "./interaction/inPageHoverMenuSelection";
 import { iframeControlledInput } from "./interaction/iframeControlledInput";
 import { isTrusted, superhumanSubmit } from "./interaction/isTrusted";
 import { keyboardDynamics } from "./interaction/keyboardDynamics";
@@ -107,4 +108,5 @@ export const interactionDetectors: Detector[] = [
   detachedNodeClick, // hard-ish: click landing on a node removed from the document
   popupOpenerIntegrity, // window.opener / referrer integrity of a target=_blank tab
   hoverMenuSelection, // open-on-hover dropdown: dwell time between open and pick
+  inPageHoverMenuSelection, // direct closed-shadow hover menu: trusted hover/click timing
 ];
