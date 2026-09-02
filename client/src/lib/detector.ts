@@ -41,6 +41,38 @@ export interface DetectorCtx {
   popupCheck?: PopupCheckState;
   /** hover-to-reveal dropdown menu selection telemetry */
   hoverMenu?: HoverMenuState;
+  /** username/password must match a freshly generated value, not just be non-empty */
+  credentials?: CredentialsState;
+  /** explicit copy/paste transfer task telemetry */
+  clipboardTransfer?: ClipboardTransferState;
+}
+
+/**
+ * Step 3 credentials task: unlike a bare "type anything" field, the
+ * username/password must match a specific value generated for this session
+ * and shown on screen — otherwise a bot could satisfy the step by pasting or
+ * autofilling any fixed string with no relation to the challenge at all.
+ */
+export interface CredentialsState {
+  expectedEmail: string;
+  expectedPassword: string;
+  complete: boolean;
+}
+
+export interface ClipboardTransferState {
+  expectedText: string;
+  copied: boolean;
+  copyTrusted: boolean | null;
+  pasteTrusted: boolean | null;
+  pastedText: string;
+  value: string;
+  copyEvents: number;
+  pasteEvents: number;
+  pasteInputEvents: number;
+  pasteInputTrusted: boolean | null;
+  pasteInputType: string;
+  directInputEvents: number;
+  completed: boolean;
 }
 
 /**
@@ -55,8 +87,10 @@ export interface DetectorCtx {
  */
 export interface HoverMenuState {
   options: string[];
+  expectedOption: string;
   /** performance.now() when the menu became visible via a real mouseenter, 0 = never opened */
   openedAt: number;
+  hoverTrusted: boolean | null;
   selectedOption: string | null;
   selectedAt: number;
   trusted: boolean;

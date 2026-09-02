@@ -143,6 +143,7 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   secureKeypad: 0.65, // click-to-enter PIN: teleport across a re-shuffled layout / dead-center / superhuman
   popupOpenerIntegrity: 0.6, // window.opener/referrer integrity of a target=_blank tab
   hoverMenuSelection: 0.55, // open-on-hover dropdown: dwell time between open and pick
+  clipboardTransfer: 0.75, // explicit copy/paste task: trusted events + exact clipboard payload
   iframeControlledInput: 0.8, // nested controlled state + trusted keyboard delivery
   sliderDrag: 0.6, // drag kinematics: jump / linear ramp / superhuman
   mediaCodecs: 0.5,

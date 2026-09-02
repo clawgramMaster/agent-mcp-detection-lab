@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { clickTeleport } from "../client/src/detectors/interaction/clickTeleport";
+import { clipboardTransfer } from "../client/src/detectors/interaction/clipboardTransfer";
 import { detachedNodeClick } from "../client/src/detectors/interaction/detachedNodeClick";
 import { exactCenterClick } from "../client/src/detectors/interaction/exactCenterClick";
 import { honeypot } from "../client/src/detectors/interaction/honeypot";
@@ -16,7 +17,11 @@ import { clipboardShortcutMismatch, pasteVsType } from "../client/src/detectors/
 import { evaluateChromeShimFidelity } from "../client/src/detectors/static/chromeShimFidelity";
 import { shadowDomIntegrity } from "../client/src/detectors/static/shadowDom";
 import type { DetectorCtx, KeySample, MouseSample } from "../client/src/lib/detector";
-import { normalizeIframeOrigin, parseIframeInputMessage } from "../client/src/lib/iframeChallenge";
+import {
+  normalizeIframeOrigin,
+  parseHoverShadowMessage,
+  parseIframeInputMessage,
+} from "../client/src/lib/iframeChallenge";
 import { aggregate } from "../shared/types";
 
 function mkCtx(p: Partial<DetectorCtx> = {}): DetectorCtx {
@@ -491,7 +496,9 @@ test("hover-menu: selected with zero dwell (no real hover) → fail", () => {
   const ctx = mkCtx({
     hoverMenu: {
       options: ["Card", "Bank transfer", "Kakao Pay"],
+      expectedOption: "Card",
       openedAt: 0,
+      hoverTrusted: null,
       selectedOption: "Card",
       selectedAt: 100,
       trusted: true,
@@ -506,7 +513,9 @@ test("hover-menu: superhuman dwell between open and pick → fail", () => {
   const ctx = mkCtx({
     hoverMenu: {
       options: ["Card", "Bank transfer", "Kakao Pay"],
+      expectedOption: "Card",
       openedAt: 100,
+      hoverTrusted: true,
       selectedOption: "Card",
       selectedAt: 130, // 30ms — faster than perception + travel into the menu
       trusted: true,
@@ -521,7 +530,9 @@ test("hover-menu: real hover dwell then a trusted pick → pass", () => {
   const ctx = mkCtx({
     hoverMenu: {
       options: ["Card", "Bank transfer", "Kakao Pay"],
+      expectedOption: "Kakao Pay",
       openedAt: 100,
+      hoverTrusted: true,
       selectedOption: "Kakao Pay",
       selectedAt: 650,
       trusted: true,
@@ -532,9 +543,79 @@ test("hover-menu: real hover dwell then a trusted pick → pass", () => {
   assert.equal(r.rating, "pass");
 });
 
+test("hover-menu: synthetic iframe hover fails even with human-like dwell", () => {
+  const ctx = mkCtx({
+    hoverMenu: {
+      options: ["Card", "Bank transfer", "Kakao Pay"],
+      expectedOption: "Bank transfer",
+      openedAt: 100,
+      hoverTrusted: false,
+      selectedOption: "Bank transfer",
+      selectedAt: 650,
+      trusted: true,
+      completed: true,
+    },
+  });
+  const r = hoverMenuSelection.run(ctx) as { rating: string };
+  assert.equal(r.rating, "fail");
+});
+
 test("hover-menu: not attempted → inconclusive", () => {
   const r = hoverMenuSelection.run(mkCtx()) as { rating: string };
   assert.equal(r.rating, "inconclusive");
+});
+
+test("clipboard transfer passes only for trusted copy/paste with matching text", () => {
+  const base = {
+    expectedText: "CLIP-abc123",
+    copied: true,
+    copyTrusted: true,
+    pasteTrusted: true,
+    pastedText: "CLIP-abc123",
+    value: "CLIP-abc123",
+    copyEvents: 1,
+    pasteEvents: 1,
+    pasteInputEvents: 1,
+    pasteInputTrusted: true,
+    pasteInputType: "insertFromPaste",
+    directInputEvents: 0,
+    completed: true,
+  };
+  const pass = clipboardTransfer.run(mkCtx({ clipboardTransfer: base })) as { rating: string };
+  assert.equal(pass.rating, "pass");
+
+  const synthetic = clipboardTransfer.run(mkCtx({ clipboardTransfer: { ...base, pasteTrusted: false } })) as {
+    rating: string;
+  };
+  assert.equal(synthetic.rating, "fail");
+
+  const injected = clipboardTransfer.run(
+    mkCtx({
+      clipboardTransfer: {
+        ...base,
+        copied: false,
+        pasteEvents: 0,
+        pasteInputEvents: 0,
+        pasteInputTrusted: null,
+        pasteInputType: "",
+        completed: false,
+      },
+    }),
+  ) as { rating: string };
+  assert.equal(injected.rating, "fail");
+
+  const assignedAfterPaste = clipboardTransfer.run(
+    mkCtx({
+      clipboardTransfer: {
+        ...base,
+        pasteInputEvents: 0,
+        pasteInputTrusted: null,
+        pasteInputType: "",
+        completed: false,
+      },
+    }),
+  ) as { rating: string };
+  assert.equal(assignedAfterPaste.rating, "fail");
 });
 
 test("slider set directly (1 sample, untrusted) → fail; skipped → inconclusive", () => {
@@ -735,4 +816,40 @@ test("iframe origin normalization rejects non-http schemes", () => {
   assert.equal(normalizeIframeOrigin("https://frame.example/path"), "https://frame.example");
   assert.equal(normalizeIframeOrigin("javascript:alert(1)"), null);
   assert.equal(normalizeIframeOrigin("not a url"), null);
+});
+
+test("hover Shadow DOM challenge accepts only the expected frame, origin, nonce, and option", () => {
+  const source = {} as MessageEventSource;
+  const payload = {
+    source: "hover-shadow-lab",
+    challengeId: "hover-1",
+    event: "select",
+    selectedOption: "Bank transfer",
+    isTrusted: true,
+    timestamp: 250,
+  } as const;
+  const expected = {
+    challengeId: "hover-1",
+    origin: "https://frame.example",
+    source,
+    options: ["Card", "Bank transfer", "Kakao Pay"],
+  };
+
+  assert.deepEqual(parseHoverShadowMessage({ data: payload, origin: expected.origin, source }, expected), payload);
+  assert.equal(parseHoverShadowMessage({ data: payload, origin: "https://spoof.example", source }, expected), null);
+  assert.equal(
+    parseHoverShadowMessage({ data: payload, origin: expected.origin, source: {} as MessageEventSource }, expected),
+    null,
+  );
+  assert.equal(
+    parseHoverShadowMessage({ data: { ...payload, challengeId: "stale" }, origin: expected.origin, source }, expected),
+    null,
+  );
+  assert.equal(
+    parseHoverShadowMessage(
+      { data: { ...payload, selectedOption: "Crypto" }, origin: expected.origin, source },
+      expected,
+    ),
+    null,
+  );
 });

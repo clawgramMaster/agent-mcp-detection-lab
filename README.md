@@ -33,13 +33,13 @@ One page, two independent scores, plus a report view (hash-routed):
     that enables CDP *after* load (calling evaluate/console/snapshot) flips the score
     live. Informational fingerprint surfaces (canvas, audio, fonts, battery, …) are
     shown but do not affect the verdict.
-  - **Behavioral score** — an *active challenge* the agent must perform, judged on
-    HOW it acts: a **grid** (ordered tile clicks → motion between targets), a
-    **slider** drag (kinematics), a **"click when it turns green"** button
-    (reaction to a visual change), free typing (`isTrusted`, keystroke dwell/cadence,
-    paste-event/value-jump consistency, `shiftKeyConsistency`), a three-level
-    certificate iframe with a masked controlled phone input and trusted iframe click, a native select
-    challenge, and hidden **honeypots** (controls invisible to a real human).
+  - **Behavioral score** — a nine-step *active challenge* the agent must perform,
+    judged on HOW it acts: a **slider** drag, a reshuffling closed-shadow-DOM
+    **security keypad**, exact generated credentials, a three-level certificate
+    iframe with masked controlled input, a DOM-churn click, popup opener/referrer
+    integrity, an iframe-embedded closed-shadow-DOM hover menu, a native select,
+    and a trusted copy/paste transfer. Keystroke timing, motion, event trust, and
+    hidden **honeypots** provide supporting evidence.
     Nothing done yet ⇒ verdict is **incomplete**, never a false "bot".
 - **`#report`** — recent runs and the latest score per `runner`, read from
   `GET /api/sessions`. Drive the lab with `?runner=<name>` to record labelled runs.

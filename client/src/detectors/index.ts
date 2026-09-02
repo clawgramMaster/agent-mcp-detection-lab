@@ -1,5 +1,6 @@
 import type { Detector } from "../lib/detector";
 import { clickTeleport } from "./interaction/clickTeleport";
+import { clipboardTransfer } from "./interaction/clipboardTransfer";
 import { detachedNodeClick } from "./interaction/detachedNodeClick";
 import { exactCenterClick } from "./interaction/exactCenterClick";
 import { honeypot } from "./interaction/honeypot";
@@ -101,6 +102,7 @@ export const interactionDetectors: Detector[] = [
   keyboardDynamics,
   pasteVsType,
   clipboardShortcutMismatch,
+  clipboardTransfer, // explicit trusted copy from source and paste into destination
   superhumanSubmit,
   detachedNodeClick, // hard-ish: click landing on a node removed from the document
   popupOpenerIntegrity, // window.opener / referrer integrity of a target=_blank tab

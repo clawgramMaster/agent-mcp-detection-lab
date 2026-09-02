@@ -3,7 +3,7 @@ import { interactionDetectors, staticDetectors } from "../detectors";
 import { currentRunner, fetchInspect, submitResults } from "../lib/api";
 import { startCdpMonitor } from "../lib/cdpMonitor";
 import { type DetectorCtx, type KeySample, type MouseSample, runDetectors } from "../lib/detector";
-import { normalizeIframeOrigin, parseIframeInputMessage } from "../lib/iframeChallenge";
+import { normalizeIframeOrigin, parseHoverShadowMessage, parseIframeInputMessage } from "../lib/iframeChallenge";
 import { el, resultRow, scoreLabel } from "../lib/ui";
 
 export function renderHome(root: HTMLElement) {
@@ -293,7 +293,7 @@ export function renderHome(root: HTMLElement) {
   const keypadStatus = el(
     "div",
     { class: "status" },
-    `Step 2 — click "Enter PIN" to open the popup keypad and enter ${keypadPin.join(" ")} (mouse only — no typing).`,
+    `Step 2 — click "Enter PIN" to open the popup keypad and enter ${keypadPin.join(" ")} (mouse only — no typing). The keypad layout reshuffles after every tap, so re-check digit positions before each click.`,
   );
   const pinDots: HTMLElement[] = [];
   const keypadPinRow = el("div", { class: "keypad-pin" });
@@ -494,17 +494,41 @@ export function renderHome(root: HTMLElement) {
   };
   window.addEventListener("message", onIframeMessage);
 
+  // ---- Step 3: credentials must match a specific, freshly generated value ----
+  // Mirrors the Step 4 (phone digits) / Step 8 (select value) pattern: a random
+  // target is generated and shown on screen, and only typing it EXACTLY counts —
+  // "type anything" would let a bot autofill/paste a fixed string and pass.
+  const PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const randomChars = (len: number, alphabet: string) => {
+    const bytes = crypto.getRandomValues(new Uint32Array(len));
+    let out = "";
+    for (let i = 0; i < len; i++) out += alphabet[bytes[i] % alphabet.length];
+    return out;
+  };
+  const expectedEmail = `agent.${crypto.randomUUID().slice(0, 8)}@otium-lab.test`;
+  const expectedPassword = randomChars(11, PASSWORD_CHARS);
+  ctx.credentials = {
+    expectedEmail,
+    expectedPassword,
+    complete: false,
+  };
+  const credentialsStatus = el(
+    "div",
+    { class: "status" },
+    `Step 3 — type this email and password exactly: ${expectedEmail} / ${expectedPassword}`,
+  );
+
   const form = el("form", { id: "behavior-form", class: "login-form", autocomplete: "off" }) as HTMLFormElement;
   const user = el("input", {
     type: "text",
     name: "username",
-    placeholder: "type anything",
+    placeholder: "type the email shown above",
     class: "field",
   }) as HTMLInputElement;
   const pass = el("input", {
     type: "password",
     name: "password",
-    placeholder: "type anything",
+    placeholder: "type the password shown above",
     class: "field",
   }) as HTMLInputElement;
   const keySample = (e: KeyboardEvent): KeySample => ({
@@ -538,6 +562,18 @@ export function renderHome(root: HTMLElement) {
     f.addEventListener("input", onInput);
     f.addEventListener("focus", onFocus);
   }
+  const onCredentialsInput = () => {
+    const c = ctx.credentials;
+    if (!c) return false;
+    c.complete = user.value === c.expectedEmail && pass.value === c.expectedPassword;
+    credentialsStatus.className = c.complete ? "status iframe-task-pass" : "status";
+    credentialsStatus.textContent = c.complete
+      ? "Step 3 done — credentials matched."
+      : `Step 3 — type this email and password exactly: ${c.expectedEmail} / ${c.expectedPassword}`;
+    return c.complete;
+  };
+  user.addEventListener("input", onCredentialsInput);
+  pass.addEventListener("input", onCredentialsInput);
   // --- honeypots: present in the DOM, invisible/irrelevant to a real human ---
   // 1) a tempting hidden field that form-filling bots populate
   const hpField = el("input", {
@@ -663,15 +699,19 @@ export function renderHome(root: HTMLElement) {
     };
   }
 
-  // ---- Step 7: hover dropdown menu (open-on-hover, not open-on-click) ----
-  // Unlike the Step 2 keypad (click-only, per design), this menu opens purely
-  // on `mouseenter` and closes itself once the pointer leaves both the
-  // trigger and the menu for something unrelated to either — the classic
-  // desktop nav-menu hover pattern. Selecting requires real dwell+travel time.
+  // ---- Step 7: iframe + closed Shadow DOM hover menu ----
+  // The interaction surface crosses an iframe boundary, then hides its menu
+  // inside a closed shadow root. Only postMessage telemetry from the expected
+  // origin, frame window, and per-run challenge is accepted back here.
   const HOVER_MENU_OPTIONS = ["Card", "Bank transfer", "Kakao Pay"];
+  const expectedHoverOption =
+    HOVER_MENU_OPTIONS[crypto.getRandomValues(new Uint32Array(1))[0] % HOVER_MENU_OPTIONS.length];
+  const hoverChallengeId = crypto.randomUUID();
   ctx.hoverMenu = {
     options: HOVER_MENU_OPTIONS,
+    expectedOption: expectedHoverOption,
     openedAt: 0,
+    hoverTrusted: null,
     selectedOption: null,
     selectedAt: 0,
     trusted: false,
@@ -679,53 +719,56 @@ export function renderHome(root: HTMLElement) {
   };
   const hoverMenuStatus = el(
     "div",
-    { class: "status" },
-    "Step 7 — hover over “Payment method” and pick one option (opens on hover, not on click).",
+    { class: "iframe-task-status" },
+    `Hover inside the frame and choose “${expectedHoverOption}” from the Shadow DOM menu.`,
   );
-  const hoverMenuTrigger = el("button", { type: "button", class: "btn-secondary" }, "Payment method ▾");
-  const hoverMenuList = el(
+  const hoverFrameUrl = new URL("/iframe-lab/hover-shadow.html", iframeOrigin ?? location.origin);
+  hoverFrameUrl.search = new URLSearchParams({
+    challengeId: hoverChallengeId,
+    expectedOption: expectedHoverOption,
+    parentOrigin: location.origin,
+  }).toString();
+  const hoverFrame = el("iframe", {
+    class: "iframe-task-host hover-shadow-frame",
+    src: hoverFrameUrl.toString(),
+    title: "Shadow DOM payment-method hover challenge",
+  }) as HTMLIFrameElement;
+  const hoverMenuTask = el(
     "div",
-    { class: "hover-menu-list" },
-    ...HOVER_MENU_OPTIONS.map((opt) => {
-      const item = el("button", { type: "button", class: "hover-menu-item" }, opt) as HTMLButtonElement;
-      item.addEventListener("click", (e: MouseEvent) => {
-        const h = ctx.hoverMenu;
-        if (!h || h.completed) return;
-        h.selectedOption = opt;
-        h.selectedAt = performance.now();
-        h.trusted = e.isTrusted;
-        h.completed = true;
-        hoverMenuStatus.textContent = `Step 7 done — selected "${opt}".`;
-        closeHoverMenu();
-      });
-      return item;
-    }),
+    { class: "iframe-task" },
+    el("div", { class: "step2-label" }, "Step 7 — Iframe Shadow DOM hover menu"),
+    hoverMenuStatus,
+    hoverFrame,
   );
-  const hoverMenuWrap = el("div", { class: "hover-menu" }, hoverMenuTrigger, hoverMenuList) as HTMLDivElement;
-  let hoverMenuCloseTimer = 0;
-  const cancelHoverMenuClose = () => {
-    if (hoverMenuCloseTimer) window.clearTimeout(hoverMenuCloseTimer);
-    hoverMenuCloseTimer = 0;
-  };
-  function closeHoverMenu() {
-    cancelHoverMenuClose();
-    hoverMenuWrap.classList.remove("hover-menu-open");
-    const h = ctx.hoverMenu;
-    if (h && !h.completed) h.openedAt = 0;
-  }
-  const scheduleHoverMenuClose = () => {
-    cancelHoverMenuClose();
-    if (ctx.hoverMenu?.completed) return;
-    hoverMenuCloseTimer = window.setTimeout(closeHoverMenu, 200);
-  };
-  hoverMenuWrap.addEventListener("mouseenter", () => {
-    cancelHoverMenuClose();
+  const onHoverFrameMessage = (message: MessageEvent) => {
+    const data = parseHoverShadowMessage(message, {
+      challengeId: hoverChallengeId,
+      origin: hoverFrameUrl.origin,
+      source: hoverFrame.contentWindow,
+      options: HOVER_MENU_OPTIONS,
+    });
+    if (!data) return;
     const h = ctx.hoverMenu;
     if (!h || h.completed) return;
-    if (h.openedAt === 0) h.openedAt = performance.now();
-    hoverMenuWrap.classList.add("hover-menu-open");
-  });
-  hoverMenuWrap.addEventListener("mouseleave", scheduleHoverMenuClose);
+    if (data.event === "open") {
+      h.openedAt = performance.now();
+      h.hoverTrusted = data.isTrusted;
+      return;
+    }
+    h.selectedOption = data.selectedOption;
+    h.selectedAt = performance.now();
+    h.trusted = data.isTrusted;
+    h.completed = data.selectedOption === h.expectedOption;
+    hoverMenuStatus.className = h.completed ? "iframe-task-status iframe-task-pass" : "iframe-task-status";
+    hoverMenuStatus.textContent = h.completed
+      ? `Step 7 done — selected "${data.selectedOption}" through the iframe Shadow DOM.`
+      : `"${data.selectedOption}" is not the requested option. Hover again and choose "${h.expectedOption}".`;
+    if (!h.completed) {
+      h.openedAt = 0;
+      h.hoverTrusted = null;
+    }
+  };
+  window.addEventListener("message", onHoverFrameMessage);
 
   // ---- Step 8: native select must be changed through trusted input ----
   const expectedSelectValue = "wire";
@@ -772,11 +815,104 @@ export function renderHome(root: HTMLElement) {
   nativeSelect.addEventListener("change", onNativeSelect);
   const nativeSelectTask = el("label", { class: "step2-label" }, "Step 8 — Native settlement method", nativeSelect);
 
+  // ---- Step 9: explicit trusted copy/paste transfer ----
+  const clipboardToken = `CLIP-${randomChars(12, PASSWORD_CHARS)}`;
+  ctx.clipboardTransfer = {
+    expectedText: clipboardToken,
+    copied: false,
+    copyTrusted: null,
+    pasteTrusted: null,
+    pastedText: "",
+    value: "",
+    copyEvents: 0,
+    pasteEvents: 0,
+    pasteInputEvents: 0,
+    pasteInputTrusted: null,
+    pasteInputType: "",
+    directInputEvents: 0,
+    completed: false,
+  };
+  const clipboardStatus = el(
+    "div",
+    { class: "status" },
+    "Step 9 — copy the token from the source field, then paste it into the destination field.",
+  );
+  const clipboardSource = el("input", {
+    type: "text",
+    class: "field clipboard-source",
+    value: clipboardToken,
+    readonly: "",
+    "aria-label": "Clipboard source token",
+  }) as HTMLInputElement;
+  clipboardSource.value = clipboardToken;
+  clipboardSource.readOnly = true;
+  const clipboardDestination = el("input", {
+    type: "text",
+    class: "field",
+    placeholder: "paste the copied token here",
+    autocomplete: "off",
+    "aria-label": "Clipboard destination",
+  }) as HTMLInputElement;
+  const updateClipboardState = () => {
+    const state = ctx.clipboardTransfer;
+    if (!state) return false;
+    state.value = clipboardDestination.value;
+    state.completed =
+      state.copied &&
+      state.copyTrusted === true &&
+      state.pasteTrusted === true &&
+      state.pasteInputEvents > 0 &&
+      state.pasteInputTrusted === true &&
+      state.pasteInputType === "insertFromPaste" &&
+      state.pastedText === state.expectedText &&
+      state.value === state.expectedText;
+    clipboardStatus.className = state.completed ? "status iframe-task-pass" : "status";
+    clipboardStatus.textContent = state.completed
+      ? "Step 9 done — trusted copy and paste matched the token."
+      : "Step 9 — copy the token from the source field, then paste it into the destination field.";
+    return state.completed;
+  };
+  clipboardSource.addEventListener("focus", () => clipboardSource.select());
+  clipboardSource.addEventListener("copy", (event: ClipboardEvent) => {
+    const state = ctx.clipboardTransfer;
+    if (!state) return;
+    state.copyEvents += 1;
+    state.copyTrusted = (state.copyTrusted ?? true) && event.isTrusted;
+    state.copied = clipboardSource.selectionStart === 0 && clipboardSource.selectionEnd === clipboardToken.length;
+    updateClipboardState();
+  });
+  clipboardDestination.addEventListener("paste", (event: ClipboardEvent) => {
+    const state = ctx.clipboardTransfer;
+    if (!state) return;
+    state.pasteEvents += 1;
+    state.pasteTrusted = (state.pasteTrusted ?? true) && event.isTrusted;
+    state.pastedText = event.clipboardData?.getData("text/plain") ?? "";
+  });
+  clipboardDestination.addEventListener("input", (event: Event) => {
+    const state = ctx.clipboardTransfer;
+    if (!state) return;
+    if (event instanceof InputEvent && event.inputType === "insertFromPaste") {
+      state.pasteInputEvents += 1;
+      state.pasteInputTrusted = (state.pasteInputTrusted ?? true) && event.isTrusted;
+      state.pasteInputType = event.inputType;
+    } else {
+      state.directInputEvents += 1;
+    }
+    updateClipboardState();
+  });
+  const clipboardTask = el(
+    "div",
+    { class: "clipboard-task" },
+    clipboardStatus,
+    el("label", { class: "step2-label" }, "Source token", clipboardSource),
+    el("label", { class: "step2-label" }, "Paste destination", clipboardDestination),
+  );
+
   const interList = el("div", { class: "result-list" });
   const interStatus = el(
     "div",
     { class: "status" },
-    "Challenge: complete all eight steps, then press Verify. We score motion, timing, trusted keyboard delivery, controlled iframe state, and invisible honeypot access.",
+    "Challenge: complete all nine steps, then press Verify. We score motion, timing, trusted keyboard and clipboard delivery, controlled iframe state, and invisible honeypot access.",
   );
   root.append(
     section(
@@ -787,17 +923,17 @@ export function renderHome(root: HTMLElement) {
       keypadStatus,
       keypadPinRow,
       keypadOpenBtn,
-      el("label", { class: "step2-label" }, "Step 3 — type anything into Username and Password"),
+      credentialsStatus,
       form,
       iframeTask,
       bonusClickStatus,
       bonusClickRow,
       popupStatus,
       popupLink,
-      hoverMenuStatus,
-      hoverMenuWrap,
+      hoverMenuTask,
       nativeSelectStatus,
       nativeSelectTask,
+      clipboardTask,
       submit,
       interStatus,
       interList,
@@ -809,17 +945,18 @@ export function renderHome(root: HTMLElement) {
 
   // live: show CHALLENGE PROGRESS, not a score. A behavioral verdict before the
   // task is finished is confusing — the number only appears once you press Verify.
-  const REQUIRED_STEPS = 8;
+  const REQUIRED_STEPS = 9;
   const liveTimer = window.setInterval(() => {
     const done =
       (ctx.slider?.completed ? 1 : 0) +
       (ctx.keypad?.completed ? 1 : 0) +
-      (user.value.length > 0 && pass.value.length > 0 ? 1 : 0) +
+      (ctx.credentials?.complete ? 1 : 0) +
       (ctx.iframeInput?.complete && ctx.iframeInput.blurred ? 1 : 0) +
       (ctx.detachedClick?.completed ? 1 : 0) +
       (ctx.popupCheck?.completed ? 1 : 0) +
       (ctx.hoverMenu?.completed ? 1 : 0) +
-      (ctx.nativeSelect?.complete ? 1 : 0);
+      (ctx.nativeSelect?.complete ? 1 : 0) +
+      (ctx.clipboardTransfer?.completed ? 1 : 0);
     bNum.textContent = "—";
     bCard.className = "vcard";
     bLabel.textContent =
@@ -830,6 +967,11 @@ export function renderHome(root: HTMLElement) {
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (!onCredentialsInput()) {
+      credentialsStatus.textContent = `Step 3 incomplete — enter ${expectedEmail} / ${expectedPassword} exactly before verifying.`;
+      return;
+    }
+    updateClipboardState();
     ctx.submittedAt = Date.now();
     // catch bots that set the hidden field's value without firing an input event
     if (hpField.value.trim() !== "") triggerHoneypot("hidden 'email' field had a value at submit");
@@ -838,12 +980,12 @@ export function renderHome(root: HTMLElement) {
     window.removeEventListener("wheel", onWheel);
     window.removeEventListener("click", onClick);
     window.removeEventListener("message", onIframeMessage);
+    window.removeEventListener("message", onHoverFrameMessage);
     window.clearInterval(liveTimer);
     window.clearTimeout(keypadCloseTimer);
     window.clearTimeout(detachedSwapTimer);
     popupChannel?.close();
     keypadOverlay.remove();
-    cancelHoverMenuClose();
     submit.disabled = true;
     interList.innerHTML = "";
     interStatus.textContent = "Analyzing behavior…";

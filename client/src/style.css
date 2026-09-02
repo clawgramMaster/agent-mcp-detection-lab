@@ -352,44 +352,6 @@ label {
   margin: 0 0 20px;
 }
 
-/* Hover dropdown menu (opens on mouseenter, not click) */
-.hover-menu {
-  position: relative;
-  display: inline-block;
-  margin: 0 0 20px;
-}
-.hover-menu-list {
-  display: none;
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  min-width: 180px;
-  background: #fbf9f4;
-  border: 1px solid var(--line, #d9d3c7);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(27, 25, 21, 0.18);
-  padding: 6px;
-  z-index: 50;
-}
-.hover-menu.hover-menu-open .hover-menu-list {
-  display: block;
-}
-.hover-menu-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: transparent;
-  padding: 8px 10px;
-  border-radius: 6px;
-  font-family: var(--sans);
-  font-size: 13px;
-  cursor: pointer;
-  color: #1b1915;
-}
-.hover-menu-item:hover {
-  background: #efece4;
-}
 .btn-ghost {
   background: var(--surface);
   color: var(--ink-soft);
@@ -448,6 +410,33 @@ label {
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   background: var(--surface);
+}
+.iframe-task-host.hover-shadow-frame {
+  height: 250px;
+}
+.clipboard-task {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin: 18px 0 20px;
+}
+.clipboard-task > .status {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.clipboard-task .step2-label {
+  margin: 0;
+}
+.clipboard-source {
+  font-family: "JetBrains Mono", monospace;
+}
+@media (max-width: 640px) {
+  .clipboard-task {
+    grid-template-columns: 1fr;
+  }
+  .clipboard-task > .status {
+    grid-column: 1;
+  }
 }
 
 /* result rows */
