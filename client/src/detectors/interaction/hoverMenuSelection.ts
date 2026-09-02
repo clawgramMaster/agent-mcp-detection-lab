@@ -25,16 +25,11 @@ export const hoverMenuSelection: Detector = {
     const ev: Record<string, unknown> = {
       expectedOption: h.expectedOption,
       selectedOption: h.selectedOption,
-      hoverTrusted: h.hoverTrusted,
     };
     let score = 0;
 
-    if (h.hoverTrusted === false) {
-      ev.untrustedHover = true;
-      score += 65;
-    }
     if (!h.trusted) {
-      ev.untrusted = true;
+      ev.untrustedClick = true;
       score += 65;
     }
     if (h.openedAt === 0) {
