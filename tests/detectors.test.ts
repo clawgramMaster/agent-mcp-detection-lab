@@ -15,6 +15,10 @@ import { popupOpenerIntegrity } from "../client/src/detectors/interaction/popupO
 import { shiftKeyConsistency } from "../client/src/detectors/interaction/shiftKeyConsistency";
 import { sliderDrag } from "../client/src/detectors/interaction/sliderDrag";
 import { clipboardShortcutMismatch, pasteVsType } from "../client/src/detectors/interaction/typing";
+import {
+  evaluateBrowserRsStealthResidue,
+  type BrowserRsResidueSurface,
+} from "../client/src/detectors/static/browserRsStealthResidue";
 import { evaluateChromeShimFidelity } from "../client/src/detectors/static/chromeShimFidelity";
 import { evaluateConsoleTiming } from "../client/src/detectors/static/cdpConsoleTiming";
 import {
@@ -22,6 +26,7 @@ import {
   type RuntimeBindingCandidate,
 } from "../client/src/detectors/static/runtimeBindingLeak";
 import { shadowDomIntegrity } from "../client/src/detectors/static/shadowDom";
+import { evaluateBrowserRsSpeechShim } from "../client/src/detectors/static/speechVoices";
 import type { DetectorCtx, KeySample, MouseSample } from "../client/src/lib/detector";
 import {
   normalizeIframeOrigin,
@@ -56,23 +61,23 @@ const key = (k: string, over: Partial<KeySample> = {}): KeySample => ({
   ...over,
 });
 
-test("large value jump after a shortcut-sized key sequence without paste fails", () => {
+test("large value jump without paste is only supporting evidence", () => {
   const r = clipboardShortcutMismatch.run(mkCtx({ keys: [key("Control"), key("v")], maxValueJump: 42 })) as {
     rating: string;
     score: number;
   };
-  assert.equal(r.rating, "fail");
-  assert.equal(r.score, 90);
+  assert.equal(r.rating, "warn");
+  assert.equal(r.score, 40);
 });
 
-test("real paste event keeps clipboard mismatch clean and pasteVsType behavior unchanged", () => {
+test("real paste event is treated as a normal human workflow", () => {
   const ctx = mkCtx({ keys: [key("Control"), key("v")], pasted: true, maxValueJump: 42 });
   const mismatch = clipboardShortcutMismatch.run(ctx) as { rating: string; score: number };
   const paste = pasteVsType.run(ctx) as { rating: string; score: number };
   assert.equal(mismatch.rating, "pass");
   assert.equal(mismatch.score, 0);
-  assert.equal(paste.rating, "warn");
-  assert.equal(paste.score, 40);
+  assert.equal(paste.rating, "pass");
+  assert.equal(paste.score, 0);
 });
 
 test("ordinary per-character typing does not trigger clipboard mismatch", () => {
@@ -83,13 +88,69 @@ test("ordinary per-character typing does not trigger clipboard mismatch", () => 
 });
 
 const runtimeEnums = {
-  OnInstalledReason: {},
-  OnRestartRequiredReason: {},
-  PlatformArch: {},
-  PlatformNaclArch: {},
-  PlatformOs: {},
-  RequestUpdateCheckStatus: {},
+  ContextType: {
+    TAB: "TAB",
+    POPUP: "POPUP",
+    BACKGROUND: "BACKGROUND",
+    OFFSCREEN_DOCUMENT: "OFFSCREEN_DOCUMENT",
+    SIDE_PANEL: "SIDE_PANEL",
+    DEVELOPER_TOOLS: "DEVELOPER_TOOLS",
+  },
+  OnInstalledReason: {
+    INSTALL: "install",
+    UPDATE: "update",
+    CHROME_UPDATE: "chrome_update",
+    SHARED_MODULE_UPDATE: "shared_module_update",
+  },
+  OnRestartRequiredReason: { APP_UPDATE: "app_update", OS_UPDATE: "os_update", PERIODIC: "periodic" },
+  PlatformArch: {
+    ARM: "arm",
+    ARM64: "arm64",
+    X86_32: "x86-32",
+    X86_64: "x86-64",
+    MIPS: "mips",
+    MIPS64: "mips64",
+    RISCV64: "riscv64",
+  },
+  PlatformNaclArch: { ARM: "arm", X86_32: "x86-32", X86_64: "x86-64", MIPS: "mips", MIPS64: "mips64" },
+  PlatformOs: { MAC: "mac", WIN: "win", ANDROID: "android", CROS: "cros", LINUX: "linux", OPENBSD: "openbsd" },
+  RequestUpdateCheckStatus: {
+    THROTTLED: "throttled",
+    NO_UPDATE: "no_update",
+    UPDATE_AVAILABLE: "update_available",
+  },
 };
+
+const browserRsResidueSurface = (over: Partial<BrowserRsResidueSurface> = {}): BrowserRsResidueSurface => ({
+  screen: Object.fromEntries(
+    ["width", "height", "availWidth", "availHeight"].map((name) => [
+      name,
+      { source: "() => v", enumerable: false, configurable: true },
+    ]),
+  ),
+  permissionsQuery: {
+    source: "function query() { [native code] }",
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  },
+  runtimeKeys: [
+    "id",
+    "connect",
+    "sendMessage",
+    "onMessage",
+    "onConnect",
+    "OnInstalledReason",
+    "OnRestartRequiredReason",
+    "PlatformArch",
+    "PlatformNaclArch",
+    "PlatformOs",
+    "RequestUpdateCheckStatus",
+  ],
+  platformArchKeys: ["ARM", "ARM64", "MIPS", "MIPS64", "X86_32", "X86_64"],
+  platformNaclArchKeys: ["ARM", "MIPS", "MIPS64", "PNACL", "X86_32", "X86_64"],
+  ...over,
+});
 
 const loadTimesShape = {
   requestTime: 1,
@@ -173,7 +234,7 @@ test("sparse chrome.runtime shim missing native enum objects fails fidelity", ()
     csi: () => ({ startE: 1, onloadT: 2, pageT: 3, tran: 15 }),
   });
   assert.equal(r.rating, "fail");
-  assert.equal(r.score, 60);
+  assert.equal(r.score, 100);
 });
 
 test("complete Chrome runtime and timing shapes pass fidelity", () => {
@@ -182,6 +243,84 @@ test("complete Chrome runtime and timing shapes pass fidelity", () => {
     loadTimes: () => loadTimesShape,
     csi: () => ({ startE: 1, onloadT: 2, pageT: 3, tran: 15 }),
   });
+  assert.equal(r.rating, "pass");
+  assert.equal(r.score, 0);
+});
+
+test("browser-rs legacy runtime enum set fails strict Chrome fidelity", () => {
+  const r = evaluateChromeShimFidelity({
+    runtime: {
+      ...runtimeEnums,
+      ContextType: undefined,
+      PlatformArch: { ...runtimeEnums.PlatformArch, RISCV64: undefined },
+      PlatformNaclArch: { ...runtimeEnums.PlatformNaclArch, PNACL: "pnacl" },
+    },
+  });
+  assert.equal(r.rating, "fail");
+  assert.equal(r.score, 60);
+});
+
+test("exact browser-rs Screen, Permissions and runtime residues fail attribution", () => {
+  const r = evaluateBrowserRsStealthResidue(browserRsResidueSurface());
+  assert.equal(r.rating, "fail");
+  assert.equal(r.score, 100);
+  assert.equal((r.evidence.signatures as string[]).length, 3);
+});
+
+test("stock Chrome prototype-owned surfaces pass browser-rs attribution", () => {
+  const r = evaluateBrowserRsStealthResidue(
+    browserRsResidueSurface({
+      screen: {},
+      permissionsQuery: undefined,
+      runtimeKeys: [],
+      platformArchKeys: [],
+      platformNaclArchKeys: [],
+    }),
+  );
+  assert.equal(r.rating, "pass");
+  assert.equal(r.score, 0);
+});
+
+test("one browser-rs-like residue warns but does not attribute alone", () => {
+  const r = evaluateBrowserRsStealthResidue(
+    browserRsResidueSurface({
+      permissionsQuery: undefined,
+      runtimeKeys: [],
+      platformArchKeys: [],
+      platformNaclArchKeys: [],
+    }),
+  );
+  assert.equal(r.rating, "warn");
+  assert.equal(r.score, 35);
+});
+
+test("exact browser-rs fixed plain-object voice list fails speech shim detection", () => {
+  const voices = [
+    ["Samantha", "en-US", true, true],
+    ["Alex", "en-US", true, false],
+    ["Daniel", "en-GB", true, false],
+    ["Karen", "en-AU", true, false],
+    ["Moira", "en-IE", true, false],
+    ["Rishi", "en-IN", true, false],
+    ["Google US English", "en-US", false, false],
+    ["Google UK English Male", "en-GB", false, false],
+  ].map(([name, lang, localService, isDefault]) => ({
+    name: String(name),
+    lang: String(lang),
+    localService: Boolean(localService),
+    default: Boolean(isDefault),
+    plainObject: true,
+  }));
+  const r = evaluateBrowserRsSpeechShim(voices, true);
+  assert.equal(r.rating, "fail");
+  assert.equal(r.score, 95);
+});
+
+test("native voice objects do not trigger browser-rs speech attribution", () => {
+  const r = evaluateBrowserRsSpeechShim(
+    [{ name: "Samantha", lang: "en-US", localService: true, default: true, plainObject: false }],
+    false,
+  );
   assert.equal(r.rating, "pass");
   assert.equal(r.score, 0);
 });
@@ -501,7 +640,7 @@ test("detached-node click: not attempted → inconclusive", () => {
   assert.equal(r.rating, "inconclusive");
 });
 
-test("popup opener integrity: missing window.opener after a trusted click → fail", () => {
+test("popup opener integrity: privacy-stripped opener after a trusted click only warns", () => {
   const ctx = mkCtx({
     popupCheck: {
       challengeId: "c1",
@@ -515,10 +654,10 @@ test("popup opener integrity: missing window.opener after a trusted click → fa
     },
   });
   const r = popupOpenerIntegrity.run(ctx) as { rating: string };
-  assert.equal(r.rating, "fail");
+  assert.equal(r.rating, "warn");
 });
 
-test("popup opener integrity: trusted click, no report ever arrives → fail", () => {
+test("popup opener integrity: popup blocker after a trusted click only warns", () => {
   const ctx = mkCtx({
     popupCheck: {
       challengeId: "c1",
@@ -532,7 +671,29 @@ test("popup opener integrity: trusted click, no report ever arrives → fail", (
     },
   });
   const r = popupOpenerIntegrity.run(ctx) as { rating: string };
+  assert.equal(r.rating, "warn");
+});
+
+test("hidden-field autofill warns without becoming a decisive honeypot hit", () => {
+  const r = honeypot.run(
+    mkCtx({
+      honeypotTriggered: true,
+      honeypotReasons: ["filled hidden 'email' field", "hidden 'email' field had a value at submit"],
+    }),
+  ) as { rating: string; score: number };
+  assert.equal(r.rating, "warn");
+  assert.equal(r.score, 35);
+});
+
+test("clicking the hidden inaccessible control remains a decisive honeypot hit", () => {
+  const r = honeypot.run(
+    mkCtx({
+      honeypotTriggered: true,
+      honeypotReasons: ["clicked hidden honeypot button"],
+    }),
+  ) as { rating: string; score: number };
   assert.equal(r.rating, "fail");
+  assert.equal(r.score, 100);
 });
 
 test("popup opener integrity: real opener + referrer present → pass", () => {
@@ -949,7 +1110,7 @@ test("nested iframe DOM injection fails when only untrusted input is observed", 
   assert.equal(r.score, 90);
 });
 
-test("trusted atomic iframe insertion still fails without keyboard dynamics", () => {
+test("trusted atomic iframe insertion only warns without keyboard dynamics", () => {
   const r = iframeControlledInput.run(
     mkCtx({
       iframeInput: {
@@ -972,8 +1133,8 @@ test("trusted atomic iframe insertion still fails without keyboard dynamics", ()
       },
     }),
   ) as { rating: string; score: number };
-  assert.equal(r.rating, "fail");
-  assert.ok(r.score >= 70);
+  assert.equal(r.rating, "warn");
+  assert.equal(r.score, 35);
 });
 
 test("nested iframe task fails when the final click is synthetic", () => {

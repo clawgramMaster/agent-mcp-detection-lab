@@ -77,13 +77,20 @@ export const iframeControlledInput: Detector = {
     }
     if (state.complete && state.blurred && state.trustedInputEvents > 0 && state.trustedClickEvents > 0) {
       let score = 0;
-      if (keydowns.length === 0 || keyups.length === 0) score += 70;
-      else if (dwells.length < Math.max(3, Math.floor(keydowns.length * 0.6))) score += 35;
-      if (dwells.length >= 4 && dwellMean < 5) score += 40;
-      if (dwells.length >= 4 && dwellStd < 1) score += 30;
-      if (inputGaps.length >= 5 && inputGapMean < 20) score += 40;
-      if (inputGaps.length >= 5 && inputGapCv < 0.08) score += 35;
-      if (state.completedAt > state.firstEventAt && state.completedAt - state.firstEventAt < 250) score += 35;
+      const alternativeInput = keydowns.length === 0 || keyups.length === 0;
+      if (alternativeInput) {
+        // Autofill, IME and assistive input can commit trusted text without a
+        // conventional keydown/keyup pair. Do not stack speed evidence on the
+        // same atomic commit.
+        score = 35;
+      } else {
+        if (dwells.length < Math.max(3, Math.floor(keydowns.length * 0.6))) score += 35;
+        if (dwells.length >= 4 && dwellMean < 5) score += 40;
+        if (dwells.length >= 4 && dwellStd < 1) score += 30;
+        if (inputGaps.length >= 5 && inputGapMean < 20) score += 40;
+        if (inputGaps.length >= 5 && inputGapCv < 0.08) score += 35;
+        if (state.completedAt > state.firstEventAt && state.completedAt - state.firstEventAt < 250) score += 35;
+      }
       if (state.untrustedInputEvents > 0) {
         score = Math.max(score, 35);
       }

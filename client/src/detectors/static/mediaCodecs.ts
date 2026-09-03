@@ -29,7 +29,7 @@ export const mediaCodecs: Detector = {
 
       if (missing && claimsGoogleChrome) {
         // Real Chrome always has these → this is bundled Chromium pretending to be Chrome.
-        return result("mediaCodecs", "fail", 65, { ...ev, contradiction: true }, undefined, "static");
+        return result("mediaCodecs", "warn", 35, { ...ev, contradiction: true }, undefined, "static");
       }
       if (missing) {
         return result("mediaCodecs", "warn", 25, ev, undefined, "static");

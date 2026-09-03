@@ -9,8 +9,8 @@ import { type Detector, result } from "../../lib/detector";
  * A human never touches them. An agent that parses the page and acts on every
  * actionable element — exactly the behavior we want to catch — trips the wire.
  *
- * Zero false-positive by construction: nothing a sighted human does can trigger
- * it, so this is a decisive (weight 1.0) tell.
+ * Clicking the hidden button is decisive. Filling the hidden field is not:
+ * password managers and browser autofill can populate visually hidden inputs.
  */
 export const honeypot: Detector = {
   test: "honeypot",
@@ -18,11 +18,23 @@ export const honeypot: Detector = {
   category: "interaction",
   run: (ctx) => {
     if (ctx.honeypotTriggered) {
+      const reasons = ctx.honeypotReasons ?? [];
+      const hiddenControlClicked = reasons.some((reason) => reason.includes("clicked hidden honeypot button"));
+      if (!hiddenControlClicked) {
+        return result(
+          "honeypot",
+          "warn",
+          35,
+          { triggered: true, reasons, note: "hidden field may have been populated by autofill" },
+          undefined,
+          "interaction",
+        );
+      }
       return result(
         "honeypot",
         "fail",
         100,
-        { triggered: true, reasons: ctx.honeypotReasons ?? [], note: "activated a control invisible to humans" },
+        { triggered: true, reasons, note: "clicked a control outside the visual and accessibility surfaces" },
         undefined,
         "interaction",
       );

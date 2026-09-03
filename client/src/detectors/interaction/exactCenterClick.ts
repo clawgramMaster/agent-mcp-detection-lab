@@ -3,12 +3,9 @@ import { type Detector, result } from "../../lib/detector";
 /**
  * Exact-center click (deviceandbrowserinfo: hasClicked*ExactCenter).
  *
- * A naive bot clicks an element's pixel centroid (left+w/2, top+h/2). A human
- * NEVER lands on the exact center. Landing within ~1px of center on a element
- * large enough that hitting dead-center by chance is implausible → bot.
- *
- * This is a hard, deterministic tell with no false-positive gray zone: it
- * encodes "you computed a centroid", which humans don't do.
+ * Repeated hits near an element's pixel centroid suggest computed coordinates,
+ * but a human can land there by chance. A single hit therefore remains only a
+ * warning.
  */
 export const exactCenterClick: Detector = {
   test: "exactCenterClick",
@@ -35,11 +32,14 @@ export const exactCenterClick: Detector = {
     const ev = { measuredClicks: measured.length, exactCenter: exact, hits };
     // A single pixel-perfect centroid hit can happen by luck — require REPEATED
     // dead-center clicks before it counts as a bot tell.
-    if (exact >= 2) {
-      return result("exactCenterClick", "fail", Math.min(100, 60 + exact * 15), ev, undefined, "interaction");
+    if (exact >= 3) {
+      return result("exactCenterClick", "fail", Math.min(100, 55 + exact * 5), ev, undefined, "interaction");
+    }
+    if (exact === 2) {
+      return result("exactCenterClick", "warn", 40, ev, undefined, "interaction");
     }
     if (exact === 1) {
-      return result("exactCenterClick", "warn", 30, ev, undefined, "interaction");
+      return result("exactCenterClick", "warn", 15, ev, undefined, "interaction");
     }
     return result("exactCenterClick", "pass", 0, ev, undefined, "interaction");
   },

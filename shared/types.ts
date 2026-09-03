@@ -114,13 +114,19 @@ export const EVIDENCE_GROUPS: Record<string, string> = {
   // keystroke family
   typingCadence: "keystroke",
   keyboardDynamics: "keystroke",
-  clipboardShortcutMismatch: "keystroke",
+  // form-entry family: autofill can trigger all of these at once
+  clipboardShortcutMismatch: "form-entry",
+  pasteVsType: "form-entry",
+  superhumanSubmit: "form-entry",
+  honeypot: "form-entry",
   iframeControlledInput: "iframe-control",
   // UA / engine consistency family
   clientHints: "ua-consistency",
   engineCoherence: "ua-consistency",
   headlessSignals: "ua-consistency",
-  chromeShimFidelity: "ua-consistency",
+  chromeShimFidelity: "browser-rs-stealth",
+  browserRsStealthResidue: "browser-rs-stealth",
+  browserRsSpeechShim: "browser-rs-stealth",
   // CDP Runtime instrumentation family
   cdpRuntimeLeak: "cdp-runtime",
   runtimeBindingLeak: "cdp-runtime",
@@ -142,40 +148,42 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   // --- strong heuristics ---
   cdpStackTrace: 0.9, // injected-script sourceURL markers
   runtimeBindingLeak: 0.9, // Runtime.addBinding's anonymous mutable native global
-  nativeToString: 0.8, // patched native fn (rare benign extensions exist → not "hard")
-  shadowDomIntegrity: 0.85, // patched attachShadow / leaked closed shadow root
-  cdpMouseLeak: 0.6,
-  secureKeypad: 0.65, // click-to-enter PIN: teleport across a re-shuffled layout / dead-center / superhuman
-  popupOpenerIntegrity: 0.6, // window.opener/referrer integrity of a target=_blank tab
-  hoverMenuSelection: 0.55, // open-on-hover dropdown: dwell time between open and pick
-  inPageHoverMenuSelection: 0.55, // direct closed-shadow hover menu: trusted hover/click timing
-  clipboardTransfer: 0.75, // explicit copy/paste task: trusted events + exact clipboard payload
-  iframeControlledInput: 0.8, // nested controlled state + trusted keyboard delivery
-  sliderDrag: 0.6, // drag kinematics: jump / linear ramp / superhuman
-  mediaCodecs: 0.5,
-  headlessSignals: 0.5,
-  chromeShimFidelity: 0.65, // sparse window.chrome shims miss native runtime/timing structure
-  clientHints: 0.5,
-  engineCoherence: 0.5,
-  permissionsMismatch: 0.5,
-  webglVendor: 0.5,
-  iframeWorkerConsistency: 0.5,
-  mouseEntropy: 0.5,
-  mouseKinematics: 0.5,
-  clickTeleport: 0.5,
-  typingCadence: 0.5,
-  keyboardDynamics: 0.5,
-  clipboardShortcutMismatch: 0.65, // large atomic insertion without a real paste event
-  httpHeaders: 0.5,
+  nativeToString: 0.45, // extensions/privacy tools can also patch native surfaces
+  shadowDomIntegrity: 0.45, // extensions can alter shadow behavior; require corroboration
+  cdpMouseLeak: 0.4,
+  secureKeypad: 0.45, // controlled task, but timing and centered-click components are probabilistic
+  popupOpenerIntegrity: 0.3, // popup blockers/privacy settings can remove opener or suppress reports
+  hoverMenuSelection: 0.35, // fast users and unusual pointer hardware can cross timing thresholds
+  inPageHoverMenuSelection: 0.35,
+  clipboardTransfer: 0.5, // explicit task, but a failed attempt is not proof of automation
+  iframeControlledInput: 0.4,
+  sliderDrag: 0.4,
+  mediaCodecs: 0.2,
+  headlessSignals: 0.4,
+  chromeShimFidelity: 0.5,
+  browserRsStealthResidue: 0.75, // legacy exact conjunction; current browser-rs no longer injects this shim
+  browserRsSpeechShim: 0.65,
+  clientHints: 0.4,
+  engineCoherence: 0.4,
+  permissionsMismatch: 0.25,
+  webglVendor: 0.25, // software rendering is legitimate in VMs and remote desktops
+  iframeWorkerConsistency: 0.4,
+  mouseEntropy: 0.3,
+  mouseKinematics: 0.3,
+  clickTeleport: 0.3,
+  typingCadence: 0.3,
+  keyboardDynamics: 0.3,
+  clipboardShortcutMismatch: 0.35, // autofill/IME can also insert large values atomically
+  httpHeaders: 0.35,
   // --- moderate / weak heuristics ---
-  shiftKeyConsistency: 0.5, // demoted from decisive: CapsLock/AltGr/layout FPs (see detector)
-  exactCenterClick: 0.5, // needs repeated dead-center hits to fire (see detector)
-  scrollDynamics: 0.4,
-  canvasRender: 0.4,
-  pointerCapabilities: 0.4,
-  superhumanSubmit: 0.4,
+  shiftKeyConsistency: 0.25, // keyboard layout inference remains incomplete
+  exactCenterClick: 0.25, // repeated center hits are suspicious, not physically impossible
+  scrollDynamics: 0.2,
+  canvasRender: 0.2,
+  pointerCapabilities: 0.25,
+  superhumanSubmit: 0.15,
   mainWorldExecution: 0, // experimental trap — informational until validated vs real runners
-  pasteVsType: 0.2, // pasting a password is legit human behavior
+  pasteVsType: 0, // pasting credentials is a normal human workflow
   tlsClient: 0.1, // weak without Bot Management
   // --- informational only (never contribute to the score) ---
   fingerprint: 0,

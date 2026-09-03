@@ -1,13 +1,38 @@
 import { type Detector, result } from "../../lib/detector";
 
-const RUNTIME_ENUMS = [
-  "OnInstalledReason",
-  "OnRestartRequiredReason",
-  "PlatformArch",
-  "PlatformNaclArch",
-  "PlatformOs",
-  "RequestUpdateCheckStatus",
-] as const;
+const RUNTIME_ENUMS: Record<string, Record<string, string>> = {
+  ContextType: {
+    TAB: "TAB",
+    POPUP: "POPUP",
+    BACKGROUND: "BACKGROUND",
+    OFFSCREEN_DOCUMENT: "OFFSCREEN_DOCUMENT",
+    SIDE_PANEL: "SIDE_PANEL",
+    DEVELOPER_TOOLS: "DEVELOPER_TOOLS",
+  },
+  OnInstalledReason: {
+    INSTALL: "install",
+    UPDATE: "update",
+    CHROME_UPDATE: "chrome_update",
+    SHARED_MODULE_UPDATE: "shared_module_update",
+  },
+  OnRestartRequiredReason: { APP_UPDATE: "app_update", OS_UPDATE: "os_update", PERIODIC: "periodic" },
+  PlatformArch: {
+    ARM: "arm",
+    ARM64: "arm64",
+    X86_32: "x86-32",
+    X86_64: "x86-64",
+    MIPS: "mips",
+    MIPS64: "mips64",
+    RISCV64: "riscv64",
+  },
+  PlatformNaclArch: { ARM: "arm", X86_32: "x86-32", X86_64: "x86-64", MIPS: "mips", MIPS64: "mips64" },
+  PlatformOs: { MAC: "mac", WIN: "win", ANDROID: "android", CROS: "cros", LINUX: "linux", OPENBSD: "openbsd" },
+  RequestUpdateCheckStatus: {
+    THROTTLED: "throttled",
+    NO_UPDATE: "no_update",
+    UPDATE_AVAILABLE: "update_available",
+  },
+};
 
 const LOAD_TIMES_FIELDS: Record<string, "number" | "string" | "boolean"> = {
   requestTime: "number",
@@ -93,9 +118,30 @@ export function evaluateChromeShimFidelity(chrome: unknown) {
 
   if (isObject(owner.runtime)) {
     measured = true;
-    const missingRuntimeEnums = RUNTIME_ENUMS.filter((name) => !isObject(owner.runtime?.[name]));
-    score += Math.round(60 * (missingRuntimeEnums.length / RUNTIME_ENUMS.length));
-    ev.runtime = { missingEnums: missingRuntimeEnums, expectedEnumCount: RUNTIME_ENUMS.length };
+    const missingRuntimeEnums: string[] = [];
+    const malformedRuntimeEnums: Record<string, unknown> = {};
+    for (const [name, expected] of Object.entries(RUNTIME_ENUMS)) {
+      const actual = owner.runtime[name];
+      if (!isObject(actual)) {
+        missingRuntimeEnums.push(name);
+        continue;
+      }
+      const missingKeys = Object.keys(expected).filter((key) => actual[key] !== expected[key]);
+      const unexpectedKeys = Object.keys(actual).filter((key) => !(key in expected));
+      if (missingKeys.length || unexpectedKeys.length) {
+        malformedRuntimeEnums[name] = {
+          ...(missingKeys.length ? { missingOrWrongKeys: missingKeys } : {}),
+          ...(unexpectedKeys.length ? { unexpectedKeys } : {}),
+        };
+      }
+    }
+    const anomalyCount = missingRuntimeEnums.length + Object.keys(malformedRuntimeEnums).length;
+    score += Math.min(100, anomalyCount * 20);
+    ev.runtime = {
+      missingEnums: missingRuntimeEnums,
+      malformedEnums: malformedRuntimeEnums,
+      expectedEnumCount: Object.keys(RUNTIME_ENUMS).length,
+    };
   }
 
   for (const [name, expected, maxScore] of [

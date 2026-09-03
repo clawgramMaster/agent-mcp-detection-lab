@@ -38,8 +38,9 @@ export const superhumanSubmit: Detector = {
     }
     const dt = ctx.submittedAt - ctx.formShownAt;
     const ev = { fillToSubmitMs: dt };
-    if (dt < 800) return result("superhumanSubmit", "fail", 80, ev, undefined, "interaction");
-    if (dt < 1800) return result("superhumanSubmit", "warn", 35, ev, undefined, "interaction");
+    // Autofill and restored form state can make a human submit quickly.
+    if (dt < 800) return result("superhumanSubmit", "warn", 40, ev, undefined, "interaction");
+    if (dt < 1800) return result("superhumanSubmit", "warn", 20, ev, undefined, "interaction");
     return result("superhumanSubmit", "pass", 0, ev, undefined, "interaction");
   },
 };

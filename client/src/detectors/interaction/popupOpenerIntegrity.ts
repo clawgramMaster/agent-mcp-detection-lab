@@ -43,13 +43,13 @@ export const popupOpenerIntegrity: Detector = {
         );
       }
       ev.noReport = true;
-      return result("popupOpenerIntegrity", "fail", 80, ev, undefined, "interaction");
+      return result("popupOpenerIntegrity", "warn", 40, ev, undefined, "interaction");
     }
 
     let score = 0;
     if (p.openerPresent === false) {
       ev.openerMissing = true;
-      score += 75;
+      score += 40;
     }
     if (p.referrerNonEmpty === false) {
       // weak on its own: privacy modes / extensions legitimately strip referrers
@@ -65,7 +65,7 @@ export const popupOpenerIntegrity: Detector = {
     }
 
     score = Math.min(100, score);
-    const rating = score >= 60 ? "fail" : score >= 25 ? "warn" : "pass";
+    const rating = score >= 60 && !p.trustedClick ? "fail" : score >= 25 ? "warn" : "pass";
     return result("popupOpenerIntegrity", rating, score, ev, undefined, "interaction");
   },
 };

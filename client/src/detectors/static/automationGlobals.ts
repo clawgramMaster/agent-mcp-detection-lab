@@ -41,10 +41,7 @@ const WINDOW_MARKERS: string[] = [
   "SequentumInputData",
   "awesomium",
   "fmget_targets",
-  "geb",
   "watinExpressionResult",
-  "spawn",
-  "emit",
 ];
 
 const DOC_MARKERS: string[] = [

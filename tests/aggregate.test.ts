@@ -77,19 +77,52 @@ test("correlated mouse signals are de-duplicated (grouped max, not multiplied)",
     r("cdpMouseLeak", "fail", 100),
     r("exactCenterClick", "fail", 100),
   ]);
-  // group "mouse-motion" max p = max(0.5,0.5,0.5,0.6,0.5)=0.6 → botScore 60
-  assert.equal(grouped.botScore, 60);
+  // group "mouse-motion" max p is cdpMouseLeak's 0.4.
+  assert.equal(grouped.botScore, 40);
+});
+
+test("browser-rs stealth residues are de-duplicated instead of stacking", () => {
+  const grouped = aggregate([
+    r("browserRsStealthResidue", "fail", 100),
+    r("browserRsSpeechShim", "fail", 95),
+    r("chromeShimFidelity", "fail", 100),
+  ]);
+  assert.equal(grouped.botScore, 75);
 });
 
 test("independent groups combine via noisy-OR", () => {
-  // one mouse group (max 0.5) + one keystroke group (max 0.5) → 1-(0.5*0.5)=0.75
+  // one mouse group (0.3) + one keystroke group (0.3) → 1-(0.7*0.7)=0.51
   const a = aggregate([r("mouseEntropy", "fail", 100), r("typingCadence", "fail", 100)]);
-  assert.equal(a.botScore, 75);
+  assert.equal(a.botScore, 51);
 });
 
-test("a single mid heuristic yields warn, not fail", () => {
-  const a = aggregate([r("canvasRender", "fail", 100)]); // weight 0.4 → 40
-  assert.equal(a.botScore, 40);
+test("a single weak environment heuristic stays below the warning threshold", () => {
+  const a = aggregate([r("canvasRender", "fail", 100)]);
+  assert.equal(a.botScore, 20);
+  assert.equal(a.verdict, "pass");
+});
+
+test("atomic credential insertion without paste cannot fail by itself", () => {
+  const a = aggregate([r("clipboardShortcutMismatch", "warn", 40)]);
+  assert.equal(a.botScore, 14);
+  assert.equal(a.verdict, "pass");
+});
+
+test("normal credential paste contributes no bot score", () => {
+  const a = aggregate([r("pasteVsType", "pass", 0)]);
+  assert.equal(a.botScore, 0);
+  assert.equal(a.contributing, 0);
+  assert.equal(a.verdict, "incomplete");
+});
+
+test("correlated autofill and privacy-popup signals do not falsely fail a human", () => {
+  const a = aggregate([
+    r("honeypot", "warn", 35),
+    r("clipboardShortcutMismatch", "warn", 40),
+    r("superhumanSubmit", "warn", 40),
+    r("popupOpenerIntegrity", "warn", 40),
+  ]);
+  assert.equal(a.botScore, 43);
   assert.equal(a.verdict, "warn");
 });
 

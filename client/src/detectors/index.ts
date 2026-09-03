@@ -21,6 +21,7 @@ import { clipboardShortcutMismatch, pasteVsType, typingCadence } from "./interac
 import { audioFingerprint } from "./static/audio";
 import { automationGlobals } from "./static/automationGlobals";
 import { batteryApi } from "./static/batteryApi";
+import { browserRsStealthResidue } from "./static/browserRsStealthResidue";
 import { canvasRender } from "./static/canvasRender";
 import { cdpRuntimeLeak, cdpStackTrace } from "./static/cdp";
 import { cdpConsoleTiming } from "./static/cdpConsoleTiming";
@@ -44,7 +45,7 @@ import { pointerCapabilities } from "./static/pointerCapabilities";
 import { runtimeBindingLeak } from "./static/runtimeBindingLeak";
 import { screenAnomalies } from "./static/screenAnomalies";
 import { shadowDomIntegrity } from "./static/shadowDom";
-import { speechVoices } from "./static/speechVoices";
+import { browserRsSpeechShim, speechVoices } from "./static/speechVoices";
 import { webdriver } from "./static/webdriver";
 import { webglVendor } from "./static/webgl";
 import { webgl2Params } from "./static/webgl2Params";
@@ -67,6 +68,8 @@ export const staticDetectors: Detector[] = [
   // headless / environment tells
   headlessSignals,
   chromeShimFidelity,
+  browserRsStealthResidue,
+  browserRsSpeechShim,
   engineCoherence,
   clientHints,
   screenAnomalies,
@@ -90,14 +93,14 @@ export const staticDetectors: Detector[] = [
 ];
 
 export const interactionDetectors: Detector[] = [
-  honeypot, // decisive: touched a human-invisible control
+  honeypot, // hidden-button click is decisive; hidden-field autofill only warns
   sliderDrag, // drag kinematics to a target
   keypadChallenge, // click-to-enter PIN on a re-shuffled closed-shadow-root keypad
   iframeControlledInput, // trusted typing through a nested controlled iframe
   nativeSelect, // trusted keyboard selection on a native select
   isTrusted,
-  shiftKeyConsistency, // KILLER: physically impossible keystroke
-  exactCenterClick, // hard physical tell: pixel-perfect centroid click
+  shiftKeyConsistency, // keyboard-layout-dependent supporting evidence
+  exactCenterClick, // repeated computed-centroid heuristic
   cdpMouseLeak,
   mouseEntropy,
   mouseKinematics,

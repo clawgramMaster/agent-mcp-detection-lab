@@ -26,7 +26,8 @@ One page, two independent scores, plus a report view (hash-routed):
 - **`#lab`** — the detector page.
   - **Passive score** — runs the moment you land: `webdriver`, legacy CDP
     `Runtime.enable` leak, CDP binding/timing signals, injection stack artifacts,
-    native-fn and Chrome-shim fidelity,
+    native-fn and Chrome-shim fidelity, browser-rs Screen/Permissions/runtime
+    residue and fixed speech-shim signatures,
     exposeFunction bindings, Electron/Node surface, headless signals,
     UA↔engine coherence, permissions,
     WebGL software renderer, iframe/worker consistency, media codecs, server-side
@@ -95,12 +96,16 @@ the Cloudflare `request.cf` network fingerprint.
 2. Correlated detectors (`EVIDENCE_GROUPS`, e.g. all mouse-motion signals) collapse
    to their single strongest signal — one physical fact isn't counted five times.
 3. Independent groups combine: `botScore = 100·(1 − ∏(1 − p_group))`.
-4. A **hard rule** (`HARD_RULES`: webdriver, framework globals, honeypot, Node/Electron,
-   binding leak, CSP bypass, live CDP leak) that fails floors the score at 95.
+4. A **hard rule** (`HARD_RULES`: webdriver, strong framework globals, a click on
+   the inaccessible honeypot control, Node/Electron, exposed framework bindings,
+   CSP bypass, live CDP leak, or synthetic controlled-task events) floors the
+   score at 95. Hidden-field autofill and statistical timing/motion signals are
+   not hard rules.
 
 Regression-tested — see `npm test` (`tests/aggregate.test.ts`, `detectors.test.ts`,
 `validate.test.ts`): keyboard-only humans, CapsLock/AltGr, single centroid click,
-idle submit and oversized/unknown API payloads all behave correctly.
+   normal paste/autofill-like input, hidden-field autofill, privacy-stripped
+   popups, idle submit and oversized/unknown API payloads all behave correctly.
 
 ## Develop
 

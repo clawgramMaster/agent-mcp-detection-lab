@@ -3,9 +3,9 @@
 > **Top insight:** The frontier of bot detection is **not** the fingerprint
 > (`navigator.*`, CDP, headless tells) — it is **behavioral**, and those tells are
 > surprisingly **physical**. You can defeat every high-tech CDP/WebDriver/Playwright
-> fingerprint check and still get flagged the moment your automation violates a
-> constraint of the human hand: *you cannot click a pixel-perfect center, your mouse
-> cannot teleport, and you cannot type `@` without holding Shift.*
+> fingerprint check and still get flagged by pointer or keyboard patterns. These
+> remain probabilistic signals and must account for chance clicks, keyboard layouts,
+> IME and assistive input rather than being treated as universal physical laws.
 
 These findings were obtained empirically by driving **agent-browser** (our Rust MCP
 browser) against **deviceandbrowserinfo.com**'s behavioral test
@@ -24,8 +24,9 @@ Puppeteer / patchright too, because CDP input synthesis has no physicality.
 
 `hasClickedEmailFieldExactCenter` · `…PasswordFieldExactCenter` · `…SubmitExactCenter`
 
-- **Principle:** a naive bot computes an element's pixel centroid (`left+w/2, top+h/2`)
-  and clicks it. A human *never* hits the exact center.
+- **Principle:** a naive bot repeatedly computes an element's pixel centroid
+  (`left+w/2, top+h/2`). A human can hit it by chance, so only repetition is
+  useful and even then it remains supporting evidence.
 - **Where the bot slips:** clicking the geometric center of every target.
 - **Evasion:** click an **off-center** point inside the element's content box — an
   offset of **12–40 % of the half-dimension**, with a random sign, per axis.
@@ -63,14 +64,13 @@ Puppeteer / patchright too, because CDP input synthesis has no physicality.
   "thinking" pauses (~18 %), the rest normal; also randomize key **hold** time.
 - **Measured:** std-dev 33 ms → 107 ms (mean ~225 ms).
 
-## 5. ⚠️ KILLER — physically impossible keystroke: shifted char without modifier
+## 5. Shift-character modifier consistency
 
 `typeAtCharacter` · `typeAtWithModifier`
 
-- **Principle:** the page listens for keydown. When it sees `@` it sets
-  `typeAtCharacter = true`; it then checks `event.shiftKey`. On a US keyboard `@` is
-  **Shift+2** — producing `@` **without** Shift held is *impossible for a human hand*,
-  so it is a definitive bot signal.
+- **Principle:** on a US keyboard, the page listens for keydown. When it sees `@`
+  it checks `event.shiftKey`. Other layouts, AltGraph, CapsLock, dead keys and IME
+  can differ, so the result is supporting evidence rather than a definitive verdict.
 - **Source evidence (`device_info.min.js`):**
   `"@" === e.key && (u.typeAtCharacter = !0, e.shiftKey ? … : …)`
 - **Where the bot slips:** synthesizing the character event directly, never asserting
@@ -101,6 +101,6 @@ the physicality of a human hand.
 | 4. Metronome typing | `typingCadence` (cv) + `keyboardDynamics` (dwell) |
 | 5. Shifted char w/o modifier | `shiftKeyConsistency` |
 
-Signals 1 and 5 are the highest-value additions: they are cheap, deterministic, and —
-unlike statistical trajectory checks — have **no false-positive gray zone**, because
-they encode a hard physical impossibility.
+Signals 1 and 5 are cheap and useful, but neither is a universal physical
+impossibility. The lab treats repeated center hits and modifier inconsistencies
+as weighted evidence and excludes known CapsLock/AltGraph cases.

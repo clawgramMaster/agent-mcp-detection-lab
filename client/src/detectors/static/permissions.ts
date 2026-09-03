@@ -16,7 +16,7 @@ export const permissionsMismatch: Detector = {
       const queried = q?.state;
       const ev = { notifPerm, queried };
       if (notifPerm === "denied" && queried === "prompt") {
-        return result("permissionsMismatch", "fail", 70, ev, undefined, "static");
+        return result("permissionsMismatch", "warn", 35, ev, undefined, "static");
       }
       if (!notifPerm || !queried) {
         return result("permissionsMismatch", "warn", 20, ev, undefined, "static");

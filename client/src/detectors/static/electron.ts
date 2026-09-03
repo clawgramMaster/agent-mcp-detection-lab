@@ -42,12 +42,29 @@ export const electronDetection: Detector = {
     if (uaData?.brands?.some((b) => /electron/i.test(b.brand))) hits.push("uaData:Electron");
     if (/Electron\//i.test(navigator.userAgent)) hits.push("ua:Electron");
 
-    if (hits.length) {
+    const definitive = hits.filter(
+      (hit) =>
+        hit === "process.versions.electron" ||
+        hit === "process.versions.node" ||
+        hit === "uaData:Electron" ||
+        hit === "ua:Electron",
+    );
+    if (definitive.length) {
       return result(
         "electronDetection",
         "fail",
-        Math.min(100, 75 + hits.length * 8),
-        { hits, electronVersion },
+        Math.min(100, 75 + definitive.length * 8),
+        { hits, definitive, electronVersion },
+        undefined,
+        "static",
+      );
+    }
+    if (hits.length) {
+      return result(
+        "electronDetection",
+        "warn",
+        hits.length >= 2 ? 35 : 20,
+        { hits, note: "generic globals can be defined by ordinary application code" },
         undefined,
         "static",
       );

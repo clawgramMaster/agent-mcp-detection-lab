@@ -54,7 +54,8 @@ export const pasteVsType: Detector = {
   category: "interaction",
   run: (ctx) => {
     if (ctx.pasted) {
-      return result("pasteVsType", "warn", 40, { pasted: true }, undefined, "interaction");
+      // Copy/paste is a normal human workflow, especially for credentials.
+      return result("pasteVsType", "pass", 0, { pasted: true }, undefined, "interaction");
     }
     // No keystrokes at all → nothing to judge (a human can submit without typing).
     if (ctx.keys.length === 0) {
@@ -86,7 +87,10 @@ export const clipboardShortcutMismatch: Detector = {
       return result("clipboardShortcutMismatch", rating, 0, ev, undefined, "interaction");
     }
     if (ctx.keys.length <= 4) {
-      return result("clipboardShortcutMismatch", "fail", 90, ev, undefined, "interaction");
+      // Autofill, password managers, IME commits and accessibility software can
+      // also produce an atomic value change without a paste event. Keep this as
+      // supporting evidence; it cannot condemn a visitor by itself.
+      return result("clipboardShortcutMismatch", "warn", 40, ev, undefined, "interaction");
     }
     return result("clipboardShortcutMismatch", "pass", 0, ev, undefined, "interaction");
   },

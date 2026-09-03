@@ -17,7 +17,7 @@ export const webglVendor: Detector = {
       const ev = { vendor, renderer };
       const soft = /SwiftShader|llvmpipe|software|Google Inc\. \(Google\)|Mesa OffScreen/i;
       if (soft.test(String(vendor)) || soft.test(String(renderer))) {
-        return result("webglVendor", "fail", 70, { ...ev, software: true }, undefined, "static");
+        return result("webglVendor", "warn", 30, { ...ev, software: true }, undefined, "static");
       }
       return result("webglVendor", "pass", 0, ev, undefined, "static");
     } catch (e) {

@@ -68,7 +68,7 @@ export const canvasRender: Detector = {
 
       // Almost nothing drawn, or a suspiciously tiny data URL → render failed.
       if (ratio < 0.02 || url.length < 120) {
-        return result("canvasRender", "fail", 60, { ...ev, blankCanvas: true }, undefined, "static");
+        return result("canvasRender", "warn", 30, { ...ev, blankCanvas: true }, undefined, "static");
       }
       return result("canvasRender", "pass", 0, ev, undefined, "static");
     } catch (e) {
