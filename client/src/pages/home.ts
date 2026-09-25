@@ -293,6 +293,47 @@ export function renderHome(root: HTMLElement) {
   const PZ_TOL = 6; // degrees
   const PZ_HOLD_MS = 1500; // the bar must then stay still this long before the round is judged
   const PZ_STOP_MS = 120; // no movement for this long counts as "the bar stopped"
+  // Shared by both sliders so the time display is identical: a progress bar that fills over
+  // PZ_HOLD_MS and the remaining time ("Hold still… 1.2s") shown in the bar's own text.
+  const makeCountdownUi = (hint: HTMLElement, fill: HTMLElement, idleText: string) => {
+    let ticker = 0;
+    let startedAt = 0;
+    const clear = () => {
+      window.clearInterval(ticker);
+      ticker = 0;
+    };
+    return {
+      start() {
+        clear();
+        startedAt = performance.now();
+        fill.style.transition = "none";
+        fill.style.width = "0%";
+        void fill.offsetWidth; // flush the reset so the fill animates from 0
+        fill.style.transition = `width ${PZ_HOLD_MS}ms linear`;
+        fill.style.width = "100%";
+        const tick = () => {
+          const left = Math.max(0, PZ_HOLD_MS - (performance.now() - startedAt)) / 1000;
+          hint.textContent = `Hold still… ${left.toFixed(1)}s`;
+        };
+        tick();
+        ticker = window.setInterval(tick, 100);
+      },
+      /** Abort: empty the bar and show `text` (the idle prompt by default). */
+      stop(text = idleText) {
+        clear();
+        fill.style.transition = "none";
+        fill.style.width = "0%";
+        hint.textContent = text;
+      },
+      /** Finish: keep the bar full and show `text`. */
+      done(text: string) {
+        clear();
+        fill.style.transition = "none";
+        fill.style.width = "100%";
+        hint.textContent = text;
+      },
+    };
+  };
   const PZ_DEG_PER_PX = 0.25; // wheel sensitivity (moves the bar; not the bar->angle mapping)
   const PZ_TRAVEL = PZ_W - 44; // handle travel (px); handle is 44px wide
   // current round: picture, cut-out center and start angle (re-rolled after a failed hold)
@@ -365,12 +406,9 @@ export function renderHome(root: HTMLElement) {
   const pzProgress = el("div", { class: "pz-progress" });
   const pzFrame = el("div", { class: "pz-frame" }, pzImage, pzDisc);
   const pzHandle = el("div", { class: "pz-handle" }, "\u2194");
-  const pzTrack = el(
-    "div",
-    { class: "pz-track" },
-    el("div", { class: "pz-hint" }, "slide the bar to turn the circle"),
-    pzHandle,
-  );
+  const pzHint = el("div", { class: "pz-hint" }, "Please slide to verify");
+  const pzTrack = el("div", { class: "pz-track" }, pzHint, pzHandle);
+  const pzCountdown = makeCountdownUi(pzHint, pzProgress, "Please slide to verify");
   const pzBox = el("div", { class: "pz-box" }, pzFrame, pzTrack, el("div", { class: "pz-bar" }, pzProgress));
   // The turn is painted into the canvas itself (no CSS transform / attribute), so the current
   // angle is never readable from the DOM. `pzSrc` is an off-DOM canvas with the un-rotated crop.
@@ -444,8 +482,7 @@ export function renderHome(root: HTMLElement) {
     window.clearTimeout(pzHoldTimer);
     pzStopTimer = 0;
     pzHoldTimer = 0;
-    pzProgress.style.transition = "none";
-    pzProgress.style.width = "0%";
+    pzCountdown.stop();
   };
   // A failed round (countdown finished while the circle was not upright) deals a fresh one:
   // different picture, cut-out spot and start angle, bar back at the start, telemetry restarted.
@@ -490,9 +527,7 @@ export function renderHome(root: HTMLElement) {
     pzStopTimer = window.setTimeout(() => {
       pzStopTimer = 0;
       pzStatus.textContent = "Step 1b — hold still… checking in a moment.";
-      void pzProgress.offsetWidth; // flush the reset so the fill animates from 0
-      pzProgress.style.transition = `width ${PZ_HOLD_MS}ms linear`;
-      pzProgress.style.width = "100%";
+      pzCountdown.start();
       pzHoldTimer = window.setTimeout(() => {
         pzHoldTimer = 0;
         if (s.completed) return;
@@ -500,6 +535,7 @@ export function renderHome(root: HTMLElement) {
           s.completed = true;
           s.completedAt = performance.now();
           pzBox.classList.add("pz-ok");
+          pzCountdown.done("Circle fits");
           pzStatus.textContent = "Step 1b done — the circle fits.";
         } else {
           pzCancelHold();
@@ -1323,11 +1359,11 @@ export function renderHome(root: HTMLElement) {
     passed: false,
     passedAt: 0,
   };
-  const VF_W = 320;
+  const VF_W = 360; // same width as the rotation puzzle above
   const VF_H = 160;
   const VF_PIECE = 56;
   const VF_TOL = 4; // px between the piece and the gap
-  const VF_HANDLE = 56;
+  const VF_HANDLE = 44; // same round handle as the rotation puzzle above
   const VF_TRAVEL = VF_W - VF_HANDLE;
   let vfScene = PUZZLE_SCENES[randomInt(PUZZLE_SCENES.length)];
   let vfGapX = 110 + randomInt(VF_W - VF_PIECE - 130);
@@ -1381,10 +1417,10 @@ export function renderHome(root: HTMLElement) {
   const vfTitle = el("div", { class: "vf-title" }, "Verify you are human");
   const vfRefresh = el("span", { class: "vf-refresh", "aria-hidden": "true" }, "\u21bb");
   const vfFrame = el("div", { class: "vf-frame" }, vfImage, vfPiece, vfRefresh);
-  const vfText = el("span", { class: "vf-text" }, "Please slide to verify");
-  const vfFill = el("div", { class: "vf-fill" });
-  const vfHandle = el("div", { class: "vf-handle" }, "\u203a");
-  const vfBar = el("div", { class: "vf-bar" }, vfFill, vfText, vfHandle);
+  // The bar reuses the rotation puzzle's classes so both sliders always look the same.
+  const vfText = el("div", { class: "pz-hint" }, "Please slide to verify");
+  const vfHandle = el("div", { class: "pz-handle" }, "\u2194");
+  const vfBar = el("div", { class: "pz-track" }, vfText, vfHandle);
   // Accessibility-only text: visually hidden but present in the accessibility tree. Not aria-hidden,
   // so a sighted user never sees it while a page-as-text reader does.
   const vfNote = el(
@@ -1400,12 +1436,15 @@ export function renderHome(root: HTMLElement) {
       via: e.detail === 0 ? "keyboard-or-script" : "pointer",
     });
   });
+  const vfProgress = el("div", { class: "pz-progress" });
+  const vfCountdown = makeCountdownUi(vfText, vfProgress, "Please slide to verify");
   const vfBox = el(
     "div",
     { class: "vf-box", role: "group", "aria-label": "Human verification (CAPTCHA)" },
     vfTitle,
     vfFrame,
     vfBar,
+    el("div", { class: "pz-bar" }, vfProgress),
     vfNote,
     vfFallback,
   );
@@ -1413,7 +1452,6 @@ export function renderHome(root: HTMLElement) {
   const vfMove = (handleX: number) => {
     vfHandleX = handleX;
     vfHandle.style.left = `${handleX}px`;
-    vfFill.style.width = `${handleX + VF_HANDLE / 2}px`;
     vfPiece.style.left = `${vfPieceX()}px`;
   };
   vfMove(0);
@@ -1428,6 +1466,7 @@ export function renderHome(root: HTMLElement) {
     window.clearTimeout(vfHoldTimer);
     vfStopTimer = 0;
     vfHoldTimer = 0;
+    vfCountdown.stop();
   };
   // A failed round (countdown ended with the piece outside the gap) deals a new picture, gap and
   // start position, and restarts the telemetry — same as the rotation puzzle.
@@ -1443,13 +1482,11 @@ export function renderHome(root: HTMLElement) {
     probe.slider = { samples: [], startedAt: 0, releasedAt: 0 };
     vfMove(0);
     vfRender();
-    vfText.textContent = "Please slide to verify";
-    vfText.style.visibility = "visible";
+    vfCountdown.stop();
   };
   const vfStartCountdown = () => {
     vfStopTimer = 0;
-    vfText.textContent = "Verifying…";
-    vfText.style.visibility = "visible";
+    vfCountdown.start();
     vfHoldTimer = window.setTimeout(() => {
       vfHoldTimer = 0;
       const probe = ctx.verifyProbe;
@@ -1459,9 +1496,9 @@ export function renderHome(root: HTMLElement) {
         probe.passedAt = performance.now();
         vfDragging = false;
         vfBox.classList.add("vf-ok");
-        vfText.textContent = "Verification passed";
+        vfCountdown.done("Verification passed");
       } else {
-        vfText.textContent = "Verification failed, please try again";
+        vfCountdown.stop("Verification failed, please try again");
         window.setTimeout(vfReroll, 900);
       }
     }, PZ_HOLD_MS);
@@ -1482,7 +1519,6 @@ export function renderHome(root: HTMLElement) {
     ctx.verifyProbe?.slider.samples.push({ x: e.clientX, y: e.clientY, t: performance.now(), trusted: e.isTrusted });
     // moving resets the countdown; it (re)starts once the handle has been still for PZ_STOP_MS
     vfCancelHold();
-    vfText.style.visibility = "hidden";
     vfStopTimer = window.setTimeout(vfStartCountdown, PZ_STOP_MS);
   });
   const vfRelease = () => {
