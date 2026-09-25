@@ -333,8 +333,24 @@ export function renderHome(root: HTMLElement) {
     pzHandle,
   );
   const pzBox = el("div", { class: "pz-box" }, pzFrame, pzTrack, el("div", { class: "pz-bar" }, pzProgress));
+  // The turn is painted into the canvas itself (no CSS transform / attribute), so the current
+  // angle is never readable from the DOM. `pzSrc` is an off-DOM canvas with the un-rotated crop.
+  let pzSrc: HTMLCanvasElement | null = null;
   const pzApply = (deg: number) => {
-    pzDisc.style.transform = `rotate(${deg}deg)`;
+    const dg = pzDisc.getContext("2d");
+    if (!dg || !pzSrc) return;
+    const c = PZ_R * 2; // canvas center (2x resolution)
+    dg.clearRect(0, 0, pzDisc.width, pzDisc.height);
+    dg.save();
+    dg.translate(c, c);
+    dg.rotate((deg * Math.PI) / 180);
+    dg.drawImage(pzSrc, -c, -c);
+    dg.restore();
+    dg.lineWidth = 4;
+    dg.strokeStyle = "rgba(255,255,255,0.9)";
+    dg.beginPath();
+    dg.arc(c, c, c - 2, 0, Math.PI * 2);
+    dg.stroke();
   };
   let pzLoadToken = 0;
   // (Re)draw the round: picture with a dashed hole, plus the cut-out disc at its start angle.
@@ -342,28 +358,27 @@ export function renderHome(root: HTMLElement) {
     const token = ++pzLoadToken;
     pzDisc.style.left = `${pzCx - PZ_R}px`;
     pzDisc.style.top = `${pzCy - PZ_R}px`;
-    pzApply(pzInitial);
+    pzSrc = null; // nothing to show until the new picture has loaded
+    pzDisc.getContext("2d")?.clearRect(0, 0, pzDisc.width, pzDisc.height);
     const img = new Image();
     img.onload = () => {
       if (token !== pzLoadToken) return; // a newer round superseded this one
       const g = pzImage.getContext("2d");
-      const dg = pzDisc.getContext("2d");
-      if (!g || !dg) return;
+      if (!g) return;
       g.clearRect(0, 0, pzImage.width, pzImage.height);
-      dg.clearRect(0, 0, pzDisc.width, pzDisc.height);
       g.drawImage(img, 0, 0, pzImage.width, pzImage.height);
-      // copy the circle out of the picture into the (rotating) disc...
-      dg.save();
-      dg.beginPath();
-      dg.arc(PZ_R * 2, PZ_R * 2, PZ_R * 2, 0, Math.PI * 2);
-      dg.clip();
-      dg.drawImage(pzImage, (pzCx - PZ_R) * 2, (pzCy - PZ_R) * 2, PZ_R * 4, PZ_R * 4, 0, 0, PZ_R * 4, PZ_R * 4);
-      dg.restore();
-      dg.lineWidth = 4;
-      dg.strokeStyle = "rgba(255,255,255,0.9)";
-      dg.beginPath();
-      dg.arc(PZ_R * 2, PZ_R * 2, PZ_R * 2 - 2, 0, Math.PI * 2);
-      dg.stroke();
+      // copy the circle out of the picture into an off-DOM canvas (un-rotated)...
+      const src = document.createElement("canvas");
+      src.width = PZ_R * 4;
+      src.height = PZ_R * 4;
+      const sg = src.getContext("2d");
+      if (!sg) return;
+      sg.beginPath();
+      sg.arc(PZ_R * 2, PZ_R * 2, PZ_R * 2, 0, Math.PI * 2);
+      sg.clip();
+      sg.drawImage(pzImage, (pzCx - PZ_R) * 2, (pzCy - PZ_R) * 2, PZ_R * 4, PZ_R * 4, 0, 0, PZ_R * 4, PZ_R * 4);
+      pzSrc = src;
+      pzApply(ctx.puzzleRotate?.angle ?? pzInitial);
       // ...then punch a dashed hole in the picture at the same spot
       g.save();
       g.beginPath();
