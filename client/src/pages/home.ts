@@ -284,17 +284,47 @@ export function renderHome(root: HTMLElement) {
   const PZ_TOL = 6; // degrees
   const PZ_HOLD_MS = 1500; // the bar must then stay still this long before the round is judged
   const PZ_STOP_MS = 120; // no movement for this long counts as "the bar stopped"
-  const PZ_DEG_PER_PX = 0.25;
+  const PZ_DEG_PER_PX = 0.25; // wheel sensitivity (moves the bar; not the bar->angle mapping)
+  const PZ_TRAVEL = PZ_W - 44; // handle travel (px); handle is 44px wide
   // current round: picture, cut-out center and start angle (re-rolled after a failed hold)
   let pzScene = PUZZLE_SCENES[randomInt(PUZZLE_SCENES.length)];
   let [pzCx, pzCy] = pzScene.spots[randomInt(pzScene.spots.length)];
-  let pzInitial = 60 + randomInt(240); // 60–299°
+  let pzInitial = 0; // angle at bar position 0 (dealt per round, see pzDeal)
+  let pzKnots: number[] = [0]; // hidden bar->turns warp (dealt per round)
   let pzHandleX = 0;
   let pzAttempts = 1;
   const normDeg = (d: number) => {
     const m = ((d % 360) + 360) % 360;
     return m > 180 ? m - 360 : m;
   };
+  // Bar position -> rotation is deliberately NOT linear and not derivable from one snapshot.
+  // Each round deals a random smooth warp u(p) (turns) through 5 segments: it speeds up, slows
+  // down and can even turn back, so the same bar distance rotates the circle by different amounts
+  // in different places. The warp lives only in this closure (never in the DOM). The solved
+  // position p* is chosen first and the start angle derived from it, so a solution always exists.
+  const pzRand = () => randomInt(1_000_000) / 1_000_000;
+  const pzTurns = (p: number) => {
+    const c = Math.max(0, Math.min(1, p));
+    const seg = Math.min(pzKnots.length - 2, Math.floor(c * (pzKnots.length - 1)));
+    const t = c * (pzKnots.length - 1) - seg;
+    const smooth = t * t * (3 - 2 * t);
+    return pzKnots[seg] + (pzKnots[seg + 1] - pzKnots[seg]) * smooth;
+  };
+  const pzAngleAt = (x: number) => normDeg(pzInitial + 360 * pzTurns(x / PZ_TRAVEL));
+  const pzDeal = () => {
+    for (;;) {
+      const knots = [0];
+      for (let i = 1; i <= 5; i++) knots.push(knots[i - 1] + (pzRand() * 2 - 1) * 0.26);
+      pzKnots = knots;
+      const target = 0.25 + pzRand() * 0.65; // where the solved position will sit
+      const eps = 0.003;
+      const degPerPx = (Math.abs(pzTurns(target + eps) - pzTurns(target - eps)) / (2 * eps)) * (360 / PZ_TRAVEL);
+      pzInitial = (((-360 * pzTurns(target)) % 360) + 360) % 360;
+      // playable at the solved spot (not razor-thin, not a huge flat zone) and never starts solved
+      if (degPerPx >= 0.4 && degPerPx <= 1.8 && Math.abs(normDeg(pzInitial)) >= 40) return;
+    }
+  };
+  pzDeal();
   ctx.puzzleRotate = {
     image: pzScene.file,
     initial: pzInitial,
@@ -416,7 +446,7 @@ export function renderHome(root: HTMLElement) {
     const others = PUZZLE_SCENES.filter((x) => x.file !== pzScene.file);
     pzScene = others[randomInt(others.length)];
     [pzCx, pzCy] = pzScene.spots[randomInt(pzScene.spots.length)];
-    pzInitial = 60 + randomInt(240);
+    pzDeal();
     pzAttempts += 1;
     pzHandleX = 0;
     pzHandle.style.left = "0px";
@@ -434,7 +464,6 @@ export function renderHome(root: HTMLElement) {
   // The bar is the main control: handle position (0..PZ_TRAVEL px) maps linearly onto one
   // full turn (0..360°) added to the initial angle. The wheel over the picture just nudges the
   // same bar, so both inputs share one state.
-  const PZ_TRAVEL = PZ_W - 44; // handle travel (px); handle is 44px wide
   const pzSetHandle = (x: number, src: "bar" | "wheel", trusted: boolean, px: number, py: number) => {
     const s = ctx.puzzleRotate;
     if (!s || s.completed) return;
@@ -443,7 +472,7 @@ export function renderHome(root: HTMLElement) {
     const dx = nx - pzHandleX;
     pzHandleX = nx;
     pzHandle.style.left = `${nx}px`;
-    s.angle = normDeg(s.initial + (nx / PZ_TRAVEL) * 360);
+    s.angle = pzAngleAt(nx);
     pzApply(s.angle);
     s.samples.push({ t: performance.now(), dy: dx, angle: s.angle, trusted, x: px, y: py, src });
     // moving resets the countdown; it (re)starts only once the bar has stopped
