@@ -4,6 +4,7 @@ import { currentRunner, fetchInspect, submitResults } from "../lib/api";
 import { startCdpMonitor } from "../lib/cdpMonitor";
 import { type DetectorCtx, type KeySample, type MouseSample, runDetectors } from "../lib/detector";
 import { normalizeIframeOrigin, parseHoverShadowMessage, parseIframeInputMessage } from "../lib/iframeChallenge";
+import { PUZZLE_SCENES } from "../lib/puzzleImages";
 import { el, resultRow, scoreLabel } from "../lib/ui";
 
 export function renderHome(root: HTMLElement) {
@@ -276,7 +277,216 @@ export function renderHome(root: HTMLElement) {
   sliderInput.addEventListener("change", onSliderRelease);
   const sliderRow = el("div", { class: "slider-row" }, sliderInput, sliderVal);
 
-  // ---- Step 2: virtual security keypad — click-to-enter PIN, no keyboard ----
+  // ---- Step 2: bar-rotate puzzle — a circle cut out of a random picture; slide the bar to turn it upright and hold ----
+  const PZ_W = 360;
+  const PZ_H = 240;
+  const PZ_R = 46; // cut-out radius
+  const PZ_TOL = 6; // degrees
+  const PZ_HOLD_MS = 1500; // the bar must then stay still this long before the round is judged
+  const PZ_STOP_MS = 120; // no movement for this long counts as "the bar stopped"
+  const PZ_DEG_PER_PX = 0.25;
+  // current round: picture, cut-out center and start angle (re-rolled after a failed hold)
+  let pzScene = PUZZLE_SCENES[randomInt(PUZZLE_SCENES.length)];
+  let [pzCx, pzCy] = pzScene.spots[randomInt(pzScene.spots.length)];
+  let pzInitial = 60 + randomInt(240); // 60–299°
+  let pzHandleX = 0;
+  let pzAttempts = 1;
+  const normDeg = (d: number) => {
+    const m = ((d % 360) + 360) % 360;
+    return m > 180 ? m - 360 : m;
+  };
+  ctx.puzzleRotate = {
+    image: pzScene.file,
+    initial: pzInitial,
+    angle: normDeg(pzInitial),
+    samples: [],
+    startedAt: 0,
+    completedAt: 0,
+    holdMs: PZ_HOLD_MS,
+    attempts: 1,
+    completed: false,
+  };
+  const pzStatus = el(
+    "div",
+    { class: "status" },
+    "Step 2 — slide the bar (or scroll over the picture) to turn the circle upright, then stop and hold still.",
+  );
+  const pzImage = document.createElement("canvas");
+  pzImage.width = PZ_W * 2;
+  pzImage.height = PZ_H * 2;
+  pzImage.className = "pz-image";
+  pzImage.style.width = `${PZ_W}px`;
+  pzImage.style.height = `${PZ_H}px`;
+  const pzDisc = document.createElement("canvas");
+  pzDisc.width = PZ_R * 4;
+  pzDisc.height = PZ_R * 4;
+  pzDisc.className = "pz-disc";
+  pzDisc.style.width = `${PZ_R * 2}px`;
+  pzDisc.style.height = `${PZ_R * 2}px`;
+  const pzProgress = el("div", { class: "pz-progress" });
+  const pzFrame = el("div", { class: "pz-frame" }, pzImage, pzDisc);
+  const pzHandle = el("div", { class: "pz-handle" }, "\u2194");
+  const pzTrack = el(
+    "div",
+    { class: "pz-track" },
+    el("div", { class: "pz-hint" }, "slide the bar to turn the circle"),
+    pzHandle,
+  );
+  const pzBox = el("div", { class: "pz-box" }, pzFrame, pzTrack, el("div", { class: "pz-bar" }, pzProgress));
+  const pzApply = (deg: number) => {
+    pzDisc.style.transform = `rotate(${deg}deg)`;
+  };
+  let pzLoadToken = 0;
+  // (Re)draw the round: picture with a dashed hole, plus the cut-out disc at its start angle.
+  const pzRender = () => {
+    const token = ++pzLoadToken;
+    pzDisc.style.left = `${pzCx - PZ_R}px`;
+    pzDisc.style.top = `${pzCy - PZ_R}px`;
+    pzApply(pzInitial);
+    const img = new Image();
+    img.onload = () => {
+      if (token !== pzLoadToken) return; // a newer round superseded this one
+      const g = pzImage.getContext("2d");
+      const dg = pzDisc.getContext("2d");
+      if (!g || !dg) return;
+      g.clearRect(0, 0, pzImage.width, pzImage.height);
+      dg.clearRect(0, 0, pzDisc.width, pzDisc.height);
+      g.drawImage(img, 0, 0, pzImage.width, pzImage.height);
+      // copy the circle out of the picture into the (rotating) disc...
+      dg.save();
+      dg.beginPath();
+      dg.arc(PZ_R * 2, PZ_R * 2, PZ_R * 2, 0, Math.PI * 2);
+      dg.clip();
+      dg.drawImage(pzImage, (pzCx - PZ_R) * 2, (pzCy - PZ_R) * 2, PZ_R * 4, PZ_R * 4, 0, 0, PZ_R * 4, PZ_R * 4);
+      dg.restore();
+      dg.lineWidth = 4;
+      dg.strokeStyle = "rgba(255,255,255,0.9)";
+      dg.beginPath();
+      dg.arc(PZ_R * 2, PZ_R * 2, PZ_R * 2 - 2, 0, Math.PI * 2);
+      dg.stroke();
+      // ...then punch a dashed hole in the picture at the same spot
+      g.save();
+      g.beginPath();
+      g.arc(pzCx * 2, pzCy * 2, PZ_R * 2, 0, Math.PI * 2);
+      g.fillStyle = "rgba(20,18,14,0.6)";
+      g.fill();
+      g.setLineDash([10, 8]);
+      g.lineWidth = 3;
+      g.strokeStyle = "rgba(255,255,255,0.85)";
+      g.stroke();
+      g.restore();
+    };
+    img.src = `/puzzle/${pzScene.file}`;
+  };
+  pzRender();
+  // Judging rule: the bar starts idle. Any movement cancels the countdown; once the bar has been
+  // still for PZ_STOP_MS a PZ_HOLD_MS countdown starts (progress bar fills). Moving again resets
+  // it. When it finishes the circle must be upright (±PZ_TOL) to pass — otherwise a new round.
+  let pzStopTimer = 0;
+  let pzHoldTimer = 0;
+  const pzAligned = () => Math.abs(ctx.puzzleRotate?.angle ?? 180) <= PZ_TOL;
+  const pzCancelHold = () => {
+    window.clearTimeout(pzStopTimer);
+    window.clearTimeout(pzHoldTimer);
+    pzStopTimer = 0;
+    pzHoldTimer = 0;
+    pzProgress.style.transition = "none";
+    pzProgress.style.width = "0%";
+  };
+  // A failed round (countdown finished while the circle was not upright) deals a fresh one:
+  // different picture, cut-out spot and start angle, bar back at the start, telemetry restarted.
+  const pzReroll = () => {
+    const s = ctx.puzzleRotate;
+    if (!s || s.completed) return;
+    const others = PUZZLE_SCENES.filter((x) => x.file !== pzScene.file);
+    pzScene = others[randomInt(others.length)];
+    [pzCx, pzCy] = pzScene.spots[randomInt(pzScene.spots.length)];
+    pzInitial = 60 + randomInt(240);
+    pzAttempts += 1;
+    pzHandleX = 0;
+    pzHandle.style.left = "0px";
+    pzDragging = false; // the grip is lost; the bar must be grabbed again
+    s.image = pzScene.file;
+    s.initial = pzInitial;
+    s.angle = normDeg(pzInitial);
+    s.samples = [];
+    s.startedAt = 0;
+    s.attempts = pzAttempts;
+    pzRender();
+    pzStatus.textContent =
+      "Step 2 — the circle was not upright, so the picture changed. Slide the bar to turn the new circle upright, then stop.";
+  };
+  // The bar is the main control: handle position (0..PZ_TRAVEL px) maps linearly onto one
+  // full turn (0..360°) added to the initial angle. The wheel over the picture just nudges the
+  // same bar, so both inputs share one state.
+  const PZ_TRAVEL = PZ_W - 44; // handle travel (px); handle is 44px wide
+  const pzSetHandle = (x: number, src: "bar" | "wheel", trusted: boolean, px: number, py: number) => {
+    const s = ctx.puzzleRotate;
+    if (!s || s.completed) return;
+    if (s.startedAt === 0) s.startedAt = performance.now();
+    const nx = Math.max(0, Math.min(PZ_TRAVEL, x));
+    const dx = nx - pzHandleX;
+    pzHandleX = nx;
+    pzHandle.style.left = `${nx}px`;
+    s.angle = normDeg(s.initial + (nx / PZ_TRAVEL) * 360);
+    pzApply(s.angle);
+    s.samples.push({ t: performance.now(), dy: dx, angle: s.angle, trusted, x: px, y: py, src });
+    // moving resets the countdown; it (re)starts only once the bar has stopped
+    pzCancelHold();
+    pzStatus.textContent = "Step 2 — turn the circle upright, then stop the bar and hold still.";
+    pzStopTimer = window.setTimeout(() => {
+      pzStopTimer = 0;
+      pzStatus.textContent = "Step 2 — hold still… checking in a moment.";
+      void pzProgress.offsetWidth; // flush the reset so the fill animates from 0
+      pzProgress.style.transition = `width ${PZ_HOLD_MS}ms linear`;
+      pzProgress.style.width = "100%";
+      pzHoldTimer = window.setTimeout(() => {
+        pzHoldTimer = 0;
+        if (s.completed) return;
+        if (pzAligned()) {
+          s.completed = true;
+          s.completedAt = performance.now();
+          pzBox.classList.add("pz-ok");
+          pzStatus.textContent = "Step 2 done — the circle fits.";
+        } else {
+          pzCancelHold();
+          pzReroll();
+        }
+      }, PZ_HOLD_MS);
+    }, PZ_STOP_MS);
+  };
+  let pzDragging = false;
+  let pzGrabDx = 0;
+  pzHandle.addEventListener("pointerdown", (e) => {
+    if (ctx.puzzleRotate?.completed) return;
+    pzDragging = true;
+    pzGrabDx = e.clientX - pzHandle.getBoundingClientRect().left;
+    pzHandle.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  pzHandle.addEventListener("pointermove", (e) => {
+    if (!pzDragging) return;
+    pzSetHandle(e.clientX - pzTrack.getBoundingClientRect().left - pzGrabDx, "bar", e.isTrusted, e.clientX, e.clientY);
+  });
+  const pzRelease = () => {
+    pzDragging = false;
+  };
+  pzHandle.addEventListener("pointerup", pzRelease);
+  pzHandle.addEventListener("pointercancel", pzRelease);
+  // wheel over the picture nudges the same bar (keeps scroll-to-rotate working too)
+  pzFrame.addEventListener(
+    "wheel",
+    (e) => {
+      if (ctx.puzzleRotate?.completed) return; // let the page scroll again once solved
+      e.preventDefault();
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? PZ_H : 1;
+      const deg = e.deltaY * unit * PZ_DEG_PER_PX;
+      pzSetHandle(pzHandleX + (deg / 360) * PZ_TRAVEL, "wheel", e.isTrusted, e.clientX, e.clientY);
+    },
+    { passive: false },
+  );
+
+  // ---- Step 3: virtual security keypad — click-to-enter PIN, no keyboard ----
   // Mirrors real bank / cert-auth "secure keypads": clicking a masked PIN field
   // pops up a small floating panel (not an inline page section) containing a
   // CLOSED shadow-root keypad (see the `shadowDomIntegrity` passive check) so
@@ -300,7 +510,7 @@ export function renderHome(root: HTMLElement) {
   const keypadStatus = el(
     "div",
     { class: "status" },
-    `Step 2 — click "Enter PIN" to open the popup keypad and enter ${keypadPin.join(" ")} (mouse only — no typing). The keypad layout reshuffles after every tap, so re-check digit positions before each click.`,
+    `Step 3 — click "Enter PIN" to open the popup keypad and enter ${keypadPin.join(" ")} (mouse only — no typing). The keypad layout reshuffles after every tap, so re-check digit positions before each click.`,
   );
   const pinDots: HTMLElement[] = [];
   const keypadPinRow = el("div", { class: "keypad-pin" });
@@ -387,8 +597,8 @@ export function renderHome(root: HTMLElement) {
       keypadOpenBtn.disabled = true;
       keypadOpenBtn.textContent = "PIN entered";
       keypadStatus.textContent = k.correct
-        ? "Step 2 done — continue to Step 3."
-        : "Step 2 done (with wrong taps) — continue to Step 3.";
+        ? "Step 3 done — continue to Step 4."
+        : "Step 3 done (with wrong taps) — continue to Step 4.";
       keypadCloseTimer = window.setTimeout(closeKeypadPopup, 350); // real secure-keypad popups auto-dismiss on completion
     } else {
       k.shuffles++;
@@ -419,7 +629,7 @@ export function renderHome(root: HTMLElement) {
   }
   renderKeypadLayout();
 
-  // ---- Step 4: trusted typing into a nested controlled iframe ----
+  // ---- Step 5: trusted typing into a nested controlled iframe ----
   const phoneSuffix = String(crypto.getRandomValues(new Uint32Array(1))[0] % 100_000_000).padStart(8, "0");
   const expectedPhoneDigits = `010${phoneSuffix}`;
   const expectedPhoneValue = `${expectedPhoneDigits.slice(0, 3)}-${expectedPhoneDigits.slice(3, 7)}-${expectedPhoneDigits.slice(7)}`;
@@ -450,7 +660,7 @@ export function renderHome(root: HTMLElement) {
   const iframeTask = el(
     "div",
     { class: "iframe-task" },
-    el("div", { class: "step2-label" }, "Step 4 — Nested certificate mobile verification"),
+    el("div", { class: "step2-label" }, "Step 5 — Nested certificate mobile verification"),
     iframeStatus,
     certificateFrame,
   );
@@ -496,13 +706,13 @@ export function renderHome(root: HTMLElement) {
     const done = state.complete && state.blurred;
     iframeStatus.className = `iframe-task-status${done ? " iframe-task-pass" : ""}`;
     iframeStatus.textContent = done
-      ? `Step 4 done — controlled state retained ${state.controlledValue} after blur · trusted inputs=${state.trustedInputEvents} · trusted clicks=${state.trustedClickEvents}.`
-      : `Step 4 — state=${state.controlledValue || "empty"} · trusted inputs=${state.trustedInputEvents} · untrusted inputs=${state.untrustedInputEvents} · trusted clicks=${state.trustedClickEvents} · untrusted clicks=${state.untrustedClickEvents}`;
+      ? `Step 5 done — controlled state retained ${state.controlledValue} after blur · trusted inputs=${state.trustedInputEvents} · trusted clicks=${state.trustedClickEvents}.`
+      : `Step 5 — state=${state.controlledValue || "empty"} · trusted inputs=${state.trustedInputEvents} · untrusted inputs=${state.untrustedInputEvents} · trusted clicks=${state.trustedClickEvents} · untrusted clicks=${state.untrustedClickEvents}`;
   };
   window.addEventListener("message", onIframeMessage);
 
-  // ---- Step 3: credentials must match a specific, freshly generated value ----
-  // Mirrors the Step 4 (phone digits) / Step 9 (select value) pattern: a random
+  // ---- Step 4: credentials must match a specific, freshly generated value ----
+  // Mirrors the Step 5 (phone digits) / Step 10 (select value) pattern: a random
   // target is generated and shown on screen, and only typing it EXACTLY counts —
   // "type anything" would let a bot autofill/paste a fixed string and pass.
   const PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -522,7 +732,7 @@ export function renderHome(root: HTMLElement) {
   const credentialsStatus = el(
     "div",
     { class: "status" },
-    `Step 3 — type this email and password exactly: ${expectedEmail} / ${expectedPassword}`,
+    `Step 4 — type this email and password exactly: ${expectedEmail} / ${expectedPassword}`,
   );
 
   const form = el("form", { id: "behavior-form", class: "login-form", autocomplete: "off" }) as HTMLFormElement;
@@ -575,8 +785,8 @@ export function renderHome(root: HTMLElement) {
     c.complete = user.value === c.expectedEmail && pass.value === c.expectedPassword;
     credentialsStatus.className = c.complete ? "status iframe-task-pass" : "status";
     credentialsStatus.textContent = c.complete
-      ? "Step 3 done — credentials matched."
-      : `Step 3 — type this email and password exactly: ${c.expectedEmail} / ${c.expectedPassword}`;
+      ? "Step 4 done — credentials matched."
+      : `Step 4 — type this email and password exactly: ${c.expectedEmail} / ${c.expectedPassword}`;
     return c.complete;
   };
   user.addEventListener("input", onCredentialsInput);
@@ -609,7 +819,7 @@ export function renderHome(root: HTMLElement) {
   ) as HTMLButtonElement;
   form.append(el("label", {}, "Username", user), el("label", {}, "Password", pass), hpField, hpButton);
 
-  // ---- Step 5: DOM-churn click test ----
+  // ---- Step 6: DOM-churn click test ----
   // The button is silently replaced by a look-alike node partway through. A
   // real pointer can only ever hit what's currently on screen; a script
   // holding a stale element handle and calling .click() on it can "hit" a
@@ -623,7 +833,7 @@ export function renderHome(root: HTMLElement) {
     replacementTrusted: false,
     completed: false,
   };
-  const bonusClickStatus = el("div", { class: "status" }, "Step 5 — click the button below.");
+  const bonusClickStatus = el("div", { class: "status" }, "Step 6 — click the button below.");
   let bonusBtn = el("button", { type: "button", class: "btn-secondary" }, "Click me") as HTMLButtonElement;
   const bonusClickRow = el("div", { class: "bonus-row" }, bonusBtn);
   const onBonusClick = (isReplacement: boolean) => (e: MouseEvent) => {
@@ -639,23 +849,20 @@ export function renderHome(root: HTMLElement) {
       d.originalClickedAfterSwap = d.swappedAt > 0 && now >= d.swappedAt;
     }
     d.completed = true;
-    bonusClickStatus.textContent = "Step 5 done — continue to Step 6.";
+    bonusClickStatus.textContent = "Step 6 done — continue to Step 7.";
   };
   bonusBtn.addEventListener("click", onBonusClick(false));
-  const detachedSwapTimer = window.setTimeout(
-    () => {
-      const d = ctx.detachedClick;
-      if (!d || d.completed) return; // already resolved via an early click — nothing to swap
-      const replacement = el("button", { type: "button", class: "btn-secondary" }, "Click me") as HTMLButtonElement;
-      replacement.addEventListener("click", onBonusClick(true));
-      d.swappedAt = performance.now();
-      bonusBtn.replaceWith(replacement);
-      bonusBtn = replacement;
-    },
-    500 + randomInt(400),
-  );
+  const detachedSwapTimer = window.setTimeout(() => {
+    const d = ctx.detachedClick;
+    if (!d || d.completed) return; // already resolved via an early click — nothing to swap
+    const replacement = el("button", { type: "button", class: "btn-secondary" }, "Click me") as HTMLButtonElement;
+    replacement.addEventListener("click", onBonusClick(true));
+    d.swappedAt = performance.now();
+    bonusBtn.replaceWith(replacement);
+    bonusBtn = replacement;
+  }, 500 + randomInt(400));
 
-  // ---- Step 6: popup window.opener / referrer integrity ----
+  // ---- Step 7: popup window.opener / referrer integrity ----
   const popupChallengeId = crypto.randomUUID();
   ctx.popupCheck = {
     challengeId: popupChallengeId,
@@ -667,7 +874,7 @@ export function renderHome(root: HTMLElement) {
     referrerNonEmpty: null,
     referrerOriginMatches: null,
   };
-  const popupStatus = el("div", { class: "status" }, "Step 6 — open the verification tab (target=_blank).");
+  const popupStatus = el("div", { class: "status" }, "Step 7 — open the verification tab (target=_blank).");
   const popupParams = new URLSearchParams({ challengeId: popupChallengeId });
   const popupLink = el(
     "a",
@@ -702,11 +909,11 @@ export function renderHome(root: HTMLElement) {
       } catch {
         p.referrerOriginMatches = false;
       }
-      popupStatus.textContent = `Step 6 done — opener=${p.openerPresent}, referrer=${p.referrerNonEmpty}.`;
+      popupStatus.textContent = `Step 7 done — opener=${p.openerPresent}, referrer=${p.referrerNonEmpty}.`;
     };
   }
 
-  // ---- Step 8: iframe + closed Shadow DOM hover menu ----
+  // ---- Step 9: iframe + closed Shadow DOM hover menu ----
   // The interaction surface crosses an iframe boundary, then hides its menu
   // inside a closed shadow root. Only postMessage telemetry from the expected
   // origin, frame window, and per-run challenge is accepted back here.
@@ -747,7 +954,7 @@ export function renderHome(root: HTMLElement) {
   const hoverMenuTask = el(
     "div",
     { class: "iframe-task" },
-    el("div", { class: "step2-label" }, "Step 8 — Iframe Shadow DOM hover menu"),
+    el("div", { class: "step2-label" }, "Step 9 — Iframe Shadow DOM hover menu"),
     hoverMenuStatus,
     hoverFrame,
   );
@@ -776,7 +983,7 @@ export function renderHome(root: HTMLElement) {
     h.completed = data.selectedOption === h.expectedOption;
     hoverMenuStatus.className = h.completed ? "iframe-task-status iframe-task-pass" : "iframe-task-status";
     hoverMenuStatus.textContent = h.completed
-      ? `Step 8 done — selected "${data.selectedOption}" through the iframe Shadow DOM.`
+      ? `Step 9 done — selected "${data.selectedOption}" through the iframe Shadow DOM.`
       : `"${data.selectedOption}" is not the requested option. Hover again and choose "${h.expectedOption}".`;
     if (!h.completed) {
       h.openedAt = 0;
@@ -789,7 +996,7 @@ export function renderHome(root: HTMLElement) {
   };
   window.addEventListener("message", onHoverFrameMessage);
 
-  // ---- Step 7: in-page closed Shadow DOM hover menu ----
+  // ---- Step 8: in-page closed Shadow DOM hover menu ----
   const inPageExpectedHoverOption = HOVER_MENU_OPTIONS[randomInt(HOVER_MENU_OPTIONS.length)];
   ctx.inPageHoverMenu = {
     options: HOVER_MENU_OPTIONS,
@@ -888,11 +1095,9 @@ export function renderHome(root: HTMLElement) {
       state.targetGap = Math.hypot(event.clientX - state.hoverStartX, event.clientY - state.hoverStartY);
       state.trusted = event.isTrusted;
       state.completed = option === state.expectedOption;
-      inPageHoverStatus.className = state.completed
-        ? "iframe-task-status iframe-task-pass"
-        : "iframe-task-status";
+      inPageHoverStatus.className = state.completed ? "iframe-task-status iframe-task-pass" : "iframe-task-status";
       inPageHoverStatus.textContent = state.completed
-        ? `Step 7 done — selected "${option}" in the page Shadow DOM.`
+        ? `Step 8 done — selected "${option}" in the page Shadow DOM.`
         : `"${option}" is not the requested option. Hover again and choose "${state.expectedOption}".`;
       closeInPageHoverMenu();
       if (state.completed) {
@@ -906,12 +1111,12 @@ export function renderHome(root: HTMLElement) {
   const inPageHoverTask = el(
     "div",
     { class: "iframe-task" },
-    el("div", { class: "step2-label" }, "Step 7 — In-page Shadow DOM hover menu"),
+    el("div", { class: "step2-label" }, "Step 8 — In-page Shadow DOM hover menu"),
     inPageHoverStatus,
     inPageHoverHost,
   );
 
-  // ---- Step 9: native select must be changed through trusted input ----
+  // ---- Step 10: native select must be changed through trusted input ----
   const expectedSelectValue = "wire";
   ctx.nativeSelect = {
     expectedValue: expectedSelectValue,
@@ -924,7 +1129,7 @@ export function renderHome(root: HTMLElement) {
   const nativeSelectStatus = el(
     "div",
     { class: "status", id: "nativeSelectStatus" },
-    "Step 9 — choose “Wire transfer” from the native Settlement method dropdown.",
+    "Step 10 — choose “Wire transfer” from the native Settlement method dropdown.",
   );
   const nativeSelect = el("select", {
     id: "trustedSelect",
@@ -950,13 +1155,13 @@ export function renderHome(root: HTMLElement) {
     if (event.type === "change") state.changeTrusted = event.isTrusted;
     state.complete = state.value === state.expectedValue;
     nativeSelectStatus.className = state.complete ? "status iframe-task-pass" : "status";
-    nativeSelectStatus.textContent = `Step 9 — value=${state.value || "empty"} · input trusted=${String(state.inputTrusted)} · change trusted=${String(state.changeTrusted)}`;
+    nativeSelectStatus.textContent = `Step 10 — value=${state.value || "empty"} · input trusted=${String(state.inputTrusted)} · change trusted=${String(state.changeTrusted)}`;
   };
   nativeSelect.addEventListener("input", onNativeSelect);
   nativeSelect.addEventListener("change", onNativeSelect);
-  const nativeSelectTask = el("label", { class: "step2-label" }, "Step 9 — Native settlement method", nativeSelect);
+  const nativeSelectTask = el("label", { class: "step2-label" }, "Step 10 — Native settlement method", nativeSelect);
 
-  // ---- Step 10: explicit trusted copy/paste transfer ----
+  // ---- Step 11: explicit trusted copy/paste transfer ----
   const clipboardToken = `CLIP-${randomChars(12, PASSWORD_CHARS)}`;
   ctx.clipboardTransfer = {
     expectedText: clipboardToken,
@@ -976,7 +1181,7 @@ export function renderHome(root: HTMLElement) {
   const clipboardStatus = el(
     "div",
     { class: "status" },
-    "Step 10 — copy the token from the source field, then paste it into the destination field.",
+    "Step 11 — copy the token from the source field, then paste it into the destination field.",
   );
   const clipboardSource = el("input", {
     type: "text",
@@ -1009,8 +1214,8 @@ export function renderHome(root: HTMLElement) {
       state.value === state.expectedText;
     clipboardStatus.className = state.completed ? "status iframe-task-pass" : "status";
     clipboardStatus.textContent = state.completed
-      ? "Step 10 done — trusted copy and paste matched the token."
-      : "Step 10 — copy the token from the source field, then paste it into the destination field.";
+      ? "Step 11 done — trusted copy and paste matched the token."
+      : "Step 11 — copy the token from the source field, then paste it into the destination field.";
     return state.completed;
   };
   clipboardSource.addEventListener("focus", () => clipboardSource.select());
@@ -1053,7 +1258,7 @@ export function renderHome(root: HTMLElement) {
   const interStatus = el(
     "div",
     { class: "status" },
-    "Challenge: complete all ten steps, then press Verify. We score motion, timing, trusted keyboard and clipboard delivery, controlled iframe state, and invisible honeypot access.",
+    "Challenge: complete all eleven steps, then press Verify. We score motion, timing, trusted keyboard and clipboard delivery, controlled iframe state, and invisible honeypot access.",
   );
   root.append(
     section(
@@ -1061,6 +1266,8 @@ export function renderHome(root: HTMLElement) {
       "Complete the task — we judge how it's done, not whether it's done",
       sliderStatus,
       sliderRow,
+      pzStatus,
+      pzBox,
       keypadStatus,
       keypadPinRow,
       keypadOpenBtn,
@@ -1087,10 +1294,11 @@ export function renderHome(root: HTMLElement) {
 
   // live: show CHALLENGE PROGRESS, not a score. A behavioral verdict before the
   // task is finished is confusing — the number only appears once you press Verify.
-  const REQUIRED_STEPS = 10;
+  const REQUIRED_STEPS = 11;
   const liveTimer = window.setInterval(() => {
     const done =
       (ctx.slider?.completed ? 1 : 0) +
+      (ctx.puzzleRotate?.completed ? 1 : 0) +
       (ctx.keypad?.completed ? 1 : 0) +
       (ctx.credentials?.complete ? 1 : 0) +
       (ctx.iframeInput?.complete && ctx.iframeInput.blurred ? 1 : 0) +
@@ -1111,7 +1319,7 @@ export function renderHome(root: HTMLElement) {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!onCredentialsInput()) {
-      credentialsStatus.textContent = `Step 3 incomplete — enter ${expectedEmail} / ${expectedPassword} exactly before verifying.`;
+      credentialsStatus.textContent = `Step 4 incomplete — enter ${expectedEmail} / ${expectedPassword} exactly before verifying.`;
       return;
     }
     updateClipboardState();

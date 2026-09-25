@@ -1,0 +1,54 @@
+Puzzle photos: real photographs from Wikimedia Commons, each dedicated to the public domain under CC0 1.0
+(https://creativecommons.org/publicdomain/zero/1.0/). Files were resized/cropped to 720x480 JPEG; no attribution is required,
+sources are listed for traceability.
+
+photo-01-lake-mountain.jpg
+  source: https://commons.wikimedia.org/wiki/File:Lake_Mountain_Landscape.jpg
+  title: File:Lake Mountain Landscape.jpg
+  license: CC0
+  author: <a rel="nofollow" class="external text" href="https://isorepublic.com/media-auth
+photo-02-chateau-dusk.jpg
+  source: https://commons.wikimedia.org/wiki/File:Chateau_Frontenac_at_dusk_in_Quebec_City.jpg
+  title: File:Chateau Frontenac at dusk in Quebec City.jpg
+  license: CC0
+  author: <a href="https://www.wikidata.org/wiki/Q115464159" class="extiw" title="d:Q
+photo-03-desert-dunes.jpg
+  source: https://commons.wikimedia.org/wiki/File:Desert_Dunes_in_New_Mexico_(Unsplash).jpg
+  title: File:Desert Dunes in New Mexico (Unsplash).jpg
+  license: CC0
+  author: Breanna Galley <a rel="nofollow" class="external text" href="https://unsplash.co
+photo-04-forest-path.jpg
+  source: https://commons.wikimedia.org/wiki/File:Overgrown_forest_path_(Unsplash).jpg
+  title: File:Overgrown forest path (Unsplash).jpg
+  license: CC0
+  author: Kirill Nechmonya <a rel="nofollow" class="external text" href="https://unsplash.
+photo-05-beach-parasols.jpg
+  source: https://commons.wikimedia.org/wiki/File:Parasols,_Evening,_Beach,_Rincon_de_la_Victoria,_Andalusia,_Spain.jpg
+  title: File:Parasols, Evening, Beach, Rincon de la Victoria, Andalusia, Spain.jpg
+  license: CC0
+  author: Jebulon
+photo-06-winter-barn.jpg
+  source: https://commons.wikimedia.org/wiki/File:Farm_barn_in_winter_(Unsplash).jpg
+  title: File:Farm barn in winter (Unsplash).jpg
+  license: CC0
+  author: Priscilla Du Preez <a rel="nofollow" class="external text" href="https://unsplas
+photo-07-alpine-village.jpg
+  source: https://commons.wikimedia.org/wiki/File:Snow-covered_M%C3%A9ribel-Centre.jpg
+  title: File:Snow-covered Méribel-Centre.jpg
+  license: CC0
+  author: Dim
+photo-08-flower-garden.jpg
+  source: https://commons.wikimedia.org/wiki/File:English_Flower_Garden_-_Hamilton_Gardens_-_Hamilton,_NZ_-_DSC06489.jpg
+  title: File:English Flower Garden - Hamilton Gardens - Hamilton, NZ - DSC06489.jpg
+  license: CC0
+  author: Daderot
+photo-09-lighthouse.jpg
+  source: https://commons.wikimedia.org/wiki/File:Coast_Lighthouse_Architecture.jpg
+  title: File:Coast Lighthouse Architecture.jpg
+  license: CC0
+  author: <a rel="nofollow" class="external text" href="https://isorepublic.com/media-auth
+photo-10-harbor-boats.jpg
+  source: https://commons.wikimedia.org/wiki/File:Boats_in_harbor_-_Picton,_NZ_-_DSC00341.jpg
+  title: File:Boats in harbor - Picton, NZ - DSC00341.jpg
+  license: CC0
+  author: Daderot

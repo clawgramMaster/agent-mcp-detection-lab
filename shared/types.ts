@@ -158,6 +158,7 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   clipboardTransfer: 0.5, // explicit task, but a failed attempt is not proof of automation
   iframeControlledInput: 0.4,
   sliderDrag: 0.4,
+  puzzleRotate: 0.4,
   mediaCodecs: 0.2,
   headlessSignals: 0.4,
   chromeShimFidelity: 0.5,

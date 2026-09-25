@@ -16,6 +16,7 @@ import { nativeSelect } from "./interaction/nativeSelect";
 import { popupOpenerIntegrity } from "./interaction/popupOpenerIntegrity";
 import { scrollDynamics } from "./interaction/scrollDynamics";
 import { shiftKeyConsistency } from "./interaction/shiftKeyConsistency";
+import { puzzleRotate } from "./interaction/puzzleRotate";
 import { sliderDrag } from "./interaction/sliderDrag";
 import { clipboardShortcutMismatch, pasteVsType, typingCadence } from "./interaction/typing";
 import { audioFingerprint } from "./static/audio";
@@ -95,6 +96,7 @@ export const staticDetectors: Detector[] = [
 export const interactionDetectors: Detector[] = [
   honeypot, // hidden-button click is decisive; hidden-field autofill only warns
   sliderDrag, // drag kinematics to a target
+  puzzleRotate, // wheel-path kinematics rotating a circular cut-out upright
   keypadChallenge, // click-to-enter PIN on a re-shuffled closed-shadow-root keypad
   iframeControlledInput, // trusted typing through a nested controlled iframe
   nativeSelect, // trusted keyboard selection on a native select

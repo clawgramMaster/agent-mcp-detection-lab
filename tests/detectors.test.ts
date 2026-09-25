@@ -13,6 +13,7 @@ import { mouseEntropy } from "../client/src/detectors/interaction/mouse";
 import { nativeSelect } from "../client/src/detectors/interaction/nativeSelect";
 import { popupOpenerIntegrity } from "../client/src/detectors/interaction/popupOpenerIntegrity";
 import { shiftKeyConsistency } from "../client/src/detectors/interaction/shiftKeyConsistency";
+import { puzzleRotate } from "../client/src/detectors/interaction/puzzleRotate";
 import { sliderDrag } from "../client/src/detectors/interaction/sliderDrag";
 import { clipboardShortcutMismatch, pasteVsType } from "../client/src/detectors/interaction/typing";
 import {
@@ -1044,6 +1045,68 @@ test("slider set directly (1 sample, untrusted) → fail; skipped → inconclusi
   assert.equal(jumped.rating, "fail");
   const skipped = sliderDrag.run(mkCtx()) as { rating: string };
   assert.equal(skipped.rating, "inconclusive");
+});
+
+test("bar-rotate puzzle: untrusted/instant → fail; linear ramp / regular timer → not pass; human-like bar drag → pass; skipped → inconclusive", () => {
+  const base = {
+    image: "photo-01-lake-mountain.jpg",
+    initial: 120,
+    angle: 0,
+    holdMs: 1500,
+    startedAt: 0,
+    completed: true,
+  };
+  const bot = puzzleRotate.run(
+    mkCtx({
+      puzzleRotate: {
+        ...base,
+        samples: [{ t: 0, dy: 200, angle: 0, trusted: false, x: 400, y: 500, src: "bar" as const }],
+        completedAt: 1510,
+      },
+    }),
+  ) as { rating: string };
+  assert.equal(bot.rating, "fail");
+  const ramp = puzzleRotate.run(
+    mkCtx({
+      puzzleRotate: {
+        ...base,
+        samples: Array.from({ length: 30 }, (_, i) => ({
+          t: i * 20,
+          dy: 8,
+          angle: 120 + i * 4,
+          trusted: true,
+          x: 250 + i * 8,
+          y: 500,
+          src: "bar" as const,
+        })),
+        completedAt: 2200,
+      },
+    }),
+  ) as { rating: string };
+  assert.notEqual(ramp.rating, "pass");
+  const human = puzzleRotate.run(
+    mkCtx({
+      puzzleRotate: {
+        ...base,
+        samples: Array.from({ length: 30 }, (_, i) => {
+          const u = i / 29;
+          const ease = u * u * (3 - 2 * u);
+          return {
+            t: i * 90 + (i % 5) * 37 + (i % 3) * 21,
+            dy: 5 + (i % 4),
+            angle: 120 + ease * 240,
+            trusted: true,
+            x: 250 + ease * 200 + Math.sin(i * 1.3) * 3,
+            y: 500 + Math.sin(i / 3) * 3 + (i % 3),
+            src: "bar" as const,
+          };
+        }),
+        completedAt: 4800,
+      },
+    }),
+  ) as { rating: string };
+  assert.equal(human.rating, "pass");
+  assert.equal((puzzleRotate.run(mkCtx()) as { rating: string }).rating, "inconclusive");
 });
 
 test("idle user (no interaction) → every behavioral detector inconclusive → verdict incomplete", () => {

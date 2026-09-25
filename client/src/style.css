@@ -745,6 +745,86 @@ label {
   min-width: 2.5ch;
   text-align: right;
 }
+/* Bar-rotate puzzle: a circle cut out of a random picture, turned by sliding the bar */
+.pz-box {
+  width: 360px;
+  max-width: 100%;
+  margin: 8px 0 20px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.pz-frame {
+  position: relative;
+  width: 360px;
+  height: 240px;
+  max-width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #d8d2c4;
+  box-sizing: border-box;
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+.pz-image {
+  display: block;
+}
+.pz-disc {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5));
+}
+.pz-track {
+  position: relative;
+  height: 44px;
+  margin-top: 8px;
+  background: #ece8df;
+  border-radius: 22px;
+  touch-action: none;
+}
+.pz-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a8477;
+  font-size: 13px;
+  pointer-events: none;
+}
+.pz-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #1b1915;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+}
+.pz-ok .pz-handle {
+  background: #2f7d52;
+}
+.pz-bar {
+  height: 6px;
+  margin-top: 8px;
+  border-radius: 3px;
+  background: #ece8df;
+  overflow: hidden;
+}
+.pz-progress {
+  height: 100%;
+  width: 0;
+  background: #2f7d52;
+}
+.pz-ok .pz-frame {
+  border-color: #2f7d52;
+}
 /* Virtual security keypad task (click-to-enter PIN, no keyboard) */
 .keypad-pin {
   display: flex;

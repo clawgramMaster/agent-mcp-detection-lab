@@ -72,7 +72,7 @@ The frame chain is
 `#applicationIframe >> #finCertSdkIframe >> #finCertSdkInnerIframe`.
 `browser_iframe_type` enters the random digits shown for that run, then
 `browser_iframe_click` must click `#blurCheck` with `isTrusted === true` to
-retain the masked number and complete Step 4. The detector measures inner-frame
+retain the masked number and complete Step 5. The detector measures inner-frame
 key dwell, input cadence, and click trust rather than accepting state changes
 alone. Reports are accepted only from the expected innermost frame, origin, and
 per-run nonce, so a top-page `postMessage` cannot spoof completion.

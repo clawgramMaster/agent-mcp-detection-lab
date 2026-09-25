@@ -29,6 +29,8 @@ export interface DetectorCtx {
   honeypotReasons?: string[];
   /** slider-drag task telemetry */
   slider?: SliderState;
+  /** bar-rotate puzzle telemetry (slide a bar to turn a circular cut-out upright, pointer/wheel path recorded) */
+  puzzleRotate?: PuzzleRotateState;
   /** virtual security-keypad task telemetry (click-to-enter PIN, no keyboard) */
   keypad?: KeypadState;
   /** masked controlled input inside the nested certificate iframe task */
@@ -50,7 +52,7 @@ export interface DetectorCtx {
 }
 
 /**
- * Step 3 credentials task: unlike a bare "type anything" field, the
+ * Step 4 credentials task: unlike a bare "type anything" field, the
  * username/password must match a specific value generated for this session
  * and shown on screen — otherwise a bot could satisfy the step by pasting or
  * autofilling any fixed string with no relation to the challenge at all.
@@ -205,6 +207,25 @@ export interface SliderState {
   samples: { v: number; t: number; trusted: boolean }[];
   startedAt: number;
   releasedAt: number;
+  completed: boolean;
+}
+
+export interface PuzzleRotateState {
+  /** scene file the puzzle picked (random per run) */
+  image: string;
+  /** rotation (deg) the circular cut-out starts at; solved when it is back to 0 */
+  initial: number;
+  /** current rotation of the cut-out, normalized to (-180, 180] */
+  angle: number;
+  /** bar-drag / wheel input while rotating; dy = bar handle delta (px), x/y = pointer position, angle = resulting rotation */
+  samples: { t: number; dy: number; angle: number; trusted: boolean; x: number; y: number; src: "bar" | "wheel" }[];
+  startedAt: number;
+  /** time the required aligned hold finished (puzzle recognized as solved) */
+  completedAt: number;
+  /** required continuous aligned hold in ms */
+  holdMs: number;
+  /** rounds dealt so far; a new (different) picture is dealt after each failed hold */
+  attempts: number;
   completed: boolean;
 }
 
