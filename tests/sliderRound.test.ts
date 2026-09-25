@@ -152,3 +152,17 @@ test("once passed, movement is ignored and no reroll follows", () => {
   assert.equal(h.log.length, before);
   assert.equal(h.clock.pending, 0);
 });
+
+test("cancel drops pending timers without dealing a new round (used when a round expires)", () => {
+  const h = harness({ aligned: () => false });
+  h.judge.moved();
+  h.clock.advance(120 + 800); // countdown running
+  h.judge.cancel();
+  h.clock.advance(10_000);
+  assert.equal(h.log.filter((l) => l === "fail" || l === "reroll" || l === "pass").length, 0);
+  assert.equal(h.clock.pending, 0);
+  // and the judge is usable again afterwards (e.g. after the refresh button)
+  h.judge.moved();
+  h.clock.advance(120 + 1500);
+  assert.ok(h.log.includes("fail"));
+});

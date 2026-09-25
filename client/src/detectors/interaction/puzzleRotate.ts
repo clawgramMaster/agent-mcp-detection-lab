@@ -15,7 +15,7 @@ import { type Detector, result } from "../../lib/detector";
  */
 export const puzzleRotate: Detector = {
   test: "puzzleRotate",
-  label: "Scroll-rotate puzzle wheel path",
+  label: "Rotation puzzle input path",
   category: "interaction",
   run: (ctx) => {
     const s = ctx.puzzleRotate;

@@ -21,7 +21,8 @@ export const verifyProbe: Detector = {
     const slid = s?.slider.samples.length ?? 0;
     const fallback = s?.fallbackClicks ?? [];
     // a failed round resets the per-round samples, so also count the persistent flags
-    const touched = slid > 0 || fallback.length > 0 || !!s?.touched || (s?.attempts ?? 1) > 1;
+    const touched =
+      slid > 0 || fallback.length > 0 || !!s?.touched || (s?.attempts ?? 1) > 1 || (s?.refreshes ?? 0) > 0;
     if (!s || !touched) {
       // not touching a decoy proves nothing either way
       return result("verifyProbe", "inconclusive", 0, { touched: false }, undefined, "interaction");
@@ -36,6 +37,7 @@ export const verifyProbe: Detector = {
       sliderUntrusted: untrustedSlide,
       sliderMs: slid > 0 ? Math.max(0, Math.round(endedAt - s.slider.startedAt)) : 0,
       touched: true,
+      refreshes: s.refreshes ?? 0,
       fallbackClicks: fallback.length,
       attempts: s.attempts,
       passed: s.passed,

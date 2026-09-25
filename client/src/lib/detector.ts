@@ -234,6 +234,8 @@ export interface VerifyProbeState {
   touched: boolean;
   /** untrusted slider events over all rounds */
   untrustedSamples: number;
+  /** clicks on the widget's refresh button */
+  refreshes: number;
 }
 
 export interface PuzzleRotateState {

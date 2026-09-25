@@ -755,12 +755,24 @@ label {
 }
 .vf-refresh {
   position: absolute;
-  top: 6px;
-  right: 8px;
+  top: 4px;
+  right: 6px;
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
   color: rgba(255, 255, 255, 0.9);
   font-size: 20px;
   line-height: 1;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+.verify-img-panel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.vf-expired .verify-img-panel {
+  opacity: 0.4;
 }
 
 /* Multi-step grid challenge */

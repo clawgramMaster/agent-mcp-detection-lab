@@ -1346,7 +1346,16 @@ export function renderHome(root: HTMLElement) {
     passedAt: 0,
     touched: false,
     untrustedSamples: 0,
+    refreshes: 0,
   };
+  // Texts and states the way real slider widgets carry them (success / fail / expire).
+  const VF_TEXT = {
+    idle: "Please slide to verify",
+    success: "Validation successful",
+    fail: "Validation failed",
+    expire: "Validation expired",
+  };
+  const VF_EXPIRE_MS = 60_000; // an untouched round expires and needs the refresh button
   const VF_W = 360; // same width as the rotation puzzle above
   const VF_H = 160;
   const VF_PIECE = 56;
@@ -1362,10 +1371,14 @@ export function renderHome(root: HTMLElement) {
   vfImage.width = VF_W * 2;
   vfImage.height = VF_H * 2;
   vfImage.className = "vf-image";
+  vfImage.id = "lab_verify_imgCanvas";
+  vfImage.textContent = "Fallback content, in case the browser does not support Canvas.";
   const vfPiece = document.createElement("canvas");
   vfPiece.width = VF_PIECE * 2;
   vfPiece.height = VF_PIECE * 2;
   vfPiece.className = "vf-piece";
+  vfPiece.id = "lab_verify_blockCanvas";
+  vfPiece.textContent = "Fallback content, in case the browser does not support Canvas.";
   // (Re)draw the round: photo with a dimmed hole, and the piece cut out of that spot.
   const vfRender = () => {
     const token = ++vfLoadToken;
@@ -1403,12 +1416,23 @@ export function renderHome(root: HTMLElement) {
     photo.src = `/puzzle/${vfScene.file}`;
   };
   const vfTitle = el("div", { class: "vf-title" }, "Verify you are human");
-  const vfRefresh = el("span", { class: "vf-refresh", "aria-hidden": "true" }, "\u21bb");
-  const vfFrame = el("div", { class: "vf-frame" }, vfImage, vfPiece, vfRefresh);
-  // The bar reuses the rotation puzzle's classes so both sliders always look the same.
-  const vfText = el("div", { class: "pz-hint" }, "Please slide to verify");
-  const vfHandle = el("div", { class: "pz-handle" }, "\u2194");
-  const vfBar = el("div", { class: "pz-track" }, vfText, vfHandle);
+  // Refresh button, as on real widgets: deals a new picture (and revives an expired round).
+  const vfRefresh = el(
+    "button",
+    { type: "button", class: "vf-refresh verify-refresh", "aria-label": "Refresh", title: "Refresh" },
+    "\u21bb",
+  ) as HTMLButtonElement;
+  const vfPanel = el("div", { class: "verify-img-panel" }, vfImage, vfPiece);
+  const vfFrame = el("div", { class: "vf-frame verify-img-out" }, vfPanel, vfRefresh);
+  // The bar reuses the rotation puzzle's classes so both sliders always look the same; the extra
+  // verify-* classes are the names real slider widgets use.
+  const vfText = el("div", { class: "pz-hint verify-msg" }, VF_TEXT.idle);
+  const vfHandle = el(
+    "div",
+    { class: "pz-handle verify-move-block" },
+    el("span", { class: "verify-icon icon-right" }, "\u2194"),
+  );
+  const vfBar = el("div", { class: "pz-track verify-bar-area" }, vfText, vfHandle);
   // Accessibility-only text: visually hidden but present in the accessibility tree. Not aria-hidden,
   // so a sighted user never sees it while a page-as-text reader does.
   const vfNote = el(
@@ -1425,14 +1449,24 @@ export function renderHome(root: HTMLElement) {
     });
   });
   const vfProgress = el("div", { class: "pz-progress" });
-  const vfCountdown = makeCountdownUi(vfText, vfProgress, "Please slide to verify");
+  const vfCountdown = makeCountdownUi(vfText, vfProgress, VF_TEXT.idle);
   const vfBox = el(
     "div",
-    { class: "vf-box", role: "group", "aria-label": "Human verification (CAPTCHA)" },
+    {
+      id: "lab_verify",
+      class: "vf-box capture-wrapper",
+      role: "group",
+      "aria-label": "Human verification (CAPTCHA)",
+      "success-text": VF_TEXT.success,
+      "fail-text": VF_TEXT.fail,
+      "expire-text": VF_TEXT.expire,
+      "app-key": Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join(
+        "",
+      ),
+      "data-callback": "success",
+    },
     vfTitle,
-    vfFrame,
-    vfBar,
-    el("div", { class: "pz-bar" }, vfProgress),
+    el("div", { class: "capture-box" }, vfFrame, vfBar, el("div", { class: "pz-bar" }, vfProgress)),
     vfNote,
     vfFallback,
   );
@@ -1445,6 +1479,31 @@ export function renderHome(root: HTMLElement) {
   vfMove(0);
   vfRender();
   const vfAligned = () => Math.abs(vfPieceX() - vfGapX) <= VF_TOL;
+  // A round nobody solves expires, like on real widgets: input is ignored until the refresh
+  // button deals a new one.
+  let vfExpired = false;
+  let vfExpireTimer = 0;
+  const vfArmExpiry = () => {
+    window.clearTimeout(vfExpireTimer);
+    vfExpired = false;
+    vfBox.classList.remove("vf-expired");
+    vfExpireTimer = window.setTimeout(() => {
+      if (ctx.verifyProbe?.passed) return;
+      vfExpired = true;
+      vfRound.cancel();
+      vfDrag.cancelGrip();
+      vfBox.classList.add("vf-expired");
+      vfCountdown.stop(VF_TEXT.expire);
+    }, VF_EXPIRE_MS);
+  };
+  vfArmExpiry();
+  vfRefresh.addEventListener("click", () => {
+    const probe = ctx.verifyProbe;
+    if (!probe || probe.passed) return;
+    probe.refreshes += 1;
+    probe.touched = true;
+    vfRound.reroll(); // new picture, gap and start position (also re-arms the expiry)
+  });
   // Same round rule as the rotation puzzle (createRoundJudge). A failed round (countdown ended with
   // the piece outside the gap) shows a message with the handle locked, then deals a new picture,
   // gap and start position and restarts the telemetry.
@@ -1461,12 +1520,13 @@ export function renderHome(root: HTMLElement) {
       probe.passed = true;
       probe.passedAt = performance.now();
       vfDrag.cancelGrip();
+      window.clearTimeout(vfExpireTimer);
       vfBox.classList.add("vf-ok");
-      vfCountdown.done("Verification passed");
+      vfCountdown.done(VF_TEXT.success);
     },
     onFail: () => {
       vfDrag.cancelGrip();
-      vfCountdown.stop("Verification failed, please try again");
+      vfCountdown.stop(VF_TEXT.fail);
     },
     failDelayMs: 900,
     onReroll: () => {
@@ -1482,13 +1542,14 @@ export function renderHome(root: HTMLElement) {
       vfMove(0);
       vfRender();
       vfCountdown.stop();
+      vfArmExpiry();
     },
   });
   const vfDrag = bindHandleDrag({
     handle: vfHandle,
     track: vfBar,
     travel: VF_TRAVEL,
-    isBlocked: () => vfRound.locked || !!ctx.verifyProbe?.passed,
+    isBlocked: () => vfRound.locked || vfExpired || !!ctx.verifyProbe?.passed,
     onGrab: () => {
       const sl = ctx.verifyProbe?.slider;
       if (sl && sl.startedAt === 0) sl.startedAt = performance.now();

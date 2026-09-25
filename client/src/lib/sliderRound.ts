@@ -49,6 +49,8 @@ export interface RoundJudge {
   readonly locked: boolean;
   /** Drop pending timers and deal the next round now. */
   reroll(): void;
+  /** Drop pending timers without dealing a new round (e.g. the round expired). */
+  cancel(): void;
 }
 
 export function createRoundJudge(config: RoundConfig, clock: Clock = defaultClock): RoundJudge {
@@ -110,5 +112,9 @@ export function createRoundJudge(config: RoundConfig, clock: Clock = defaultCloc
       return locked;
     },
     reroll,
+    cancel() {
+      clearTimers();
+      locked = false;
+    },
   };
 }

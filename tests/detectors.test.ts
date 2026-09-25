@@ -1123,6 +1123,7 @@ test("verify probe: untouched → inconclusive; slider only → pass; untrusted 
     passedAt: 0,
     touched: false,
     untrustedSamples: 0,
+    refreshes: 0,
   };
   assert.equal((verifyProbe.run(mkCtx()) as { rating: string }).rating, "inconclusive");
   assert.equal((verifyProbe.run(mkCtx({ verifyProbe: base })) as { rating: string }).rating, "inconclusive");
@@ -1180,6 +1181,13 @@ test("verify probe: untouched → inconclusive; slider only → pass; untrusted 
     mkCtx({ verifyProbe: { ...base, fallbackClicks: [{ t: 900, trusted: true, via: "keyboard-or-script" }] } }),
   ) as { rating: string; evidence?: Record<string, unknown> };
   assert.equal(followed.rating, "warn");
+  // only the refresh button was used: still engagement
+  const refreshed = verifyProbe.run(mkCtx({ verifyProbe: { ...base, refreshes: 2 } })) as {
+    rating: string;
+    evidence?: Record<string, unknown>;
+  };
+  assert.notEqual(refreshed.rating, "inconclusive");
+  assert.equal(refreshed.evidence?.refreshes, 2);
   // a failed round resets the per-round samples: the earlier attempt must still count as touched
   const retried = verifyProbe.run(mkCtx({ verifyProbe: { ...base, attempts: 3 } })) as {
     rating: string;
