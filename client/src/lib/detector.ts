@@ -29,6 +29,8 @@ export interface DetectorCtx {
   honeypotReasons?: string[];
   /** slider-drag task telemetry */
   slider?: SliderState;
+  /** look-alike "please slide to verify" widget probe (informational; never required) */
+  verifyProbe?: VerifyProbeState;
   /** bar-rotate puzzle telemetry (slide a bar to turn a circular cut-out upright, pointer/wheel path recorded) */
   puzzleRotate?: PuzzleRotateState;
   /** virtual security-keypad task telemetry (click-to-enter PIN, no keyboard) */
@@ -208,6 +210,19 @@ export interface SliderState {
   startedAt: number;
   releasedAt: number;
   completed: boolean;
+}
+
+/**
+ * Decoy verification widget. It looks like a slider CAPTCHA but verifies nothing and no step
+ * depends on it. Beside the slider it carries text that only exists in the accessibility tree /
+ * DOM (a "Sign in to verify" fallback). We record whether a session touches the slider and
+ * whether it follows the accessibility-only text.
+ */
+export interface VerifyProbeState {
+  shownAt: number;
+  slider: { samples: { x: number; y: number; t: number; trusted: boolean }[]; startedAt: number; releasedAt: number };
+  /** activations of the accessibility-only fallback control */
+  fallbackClicks: { t: number; trusted: boolean; via: "pointer" | "keyboard-or-script" }[];
 }
 
 export interface PuzzleRotateState {

@@ -14,6 +14,7 @@ import { nativeSelect } from "../client/src/detectors/interaction/nativeSelect";
 import { popupOpenerIntegrity } from "../client/src/detectors/interaction/popupOpenerIntegrity";
 import { shiftKeyConsistency } from "../client/src/detectors/interaction/shiftKeyConsistency";
 import { puzzleRotate } from "../client/src/detectors/interaction/puzzleRotate";
+import { verifyProbe } from "../client/src/detectors/interaction/verifyProbe";
 import { sliderDrag } from "../client/src/detectors/interaction/sliderDrag";
 import { clipboardShortcutMismatch, pasteVsType } from "../client/src/detectors/interaction/typing";
 import {
@@ -34,7 +35,7 @@ import {
   parseHoverShadowMessage,
   parseIframeInputMessage,
 } from "../client/src/lib/iframeChallenge";
-import { aggregate } from "../shared/types";
+import { DETECTOR_WEIGHTS, aggregate } from "../shared/types";
 
 function mkCtx(p: Partial<DetectorCtx> = {}): DetectorCtx {
   return {
@@ -1107,6 +1108,40 @@ test("bar-rotate puzzle: untrusted/instant → fail; linear ramp / regular timer
   ) as { rating: string };
   assert.equal(human.rating, "pass");
   assert.equal((puzzleRotate.run(mkCtx()) as { rating: string }).rating, "inconclusive");
+});
+
+test("verify probe: untouched → inconclusive; slider only → pass; untrusted slide / hidden-text click → warn; weight 0", () => {
+  const base = { shownAt: 0, slider: { samples: [], startedAt: 0, releasedAt: 0 }, fallbackClicks: [] };
+  assert.equal((verifyProbe.run(mkCtx()) as { rating: string }).rating, "inconclusive");
+  assert.equal((verifyProbe.run(mkCtx({ verifyProbe: base })) as { rating: string }).rating, "inconclusive");
+  const human = verifyProbe.run(
+    mkCtx({
+      verifyProbe: {
+        ...base,
+        slider: {
+          samples: Array.from({ length: 12 }, (_, i) => ({ x: 100 + i * 9, y: 300 + (i % 3), t: i * 30, trusted: true })),
+          startedAt: 0,
+          releasedAt: 400,
+        },
+      },
+    }),
+  ) as { rating: string };
+  assert.equal(human.rating, "pass");
+  const synthetic = verifyProbe.run(
+    mkCtx({
+      verifyProbe: {
+        ...base,
+        slider: { samples: [{ x: 100, y: 300, t: 0, trusted: false }], startedAt: 0, releasedAt: 5 },
+      },
+    }),
+  ) as { rating: string };
+  assert.equal(synthetic.rating, "warn");
+  const followed = verifyProbe.run(
+    mkCtx({ verifyProbe: { ...base, fallbackClicks: [{ t: 900, trusted: true, via: "keyboard-or-script" }] } }),
+  ) as { rating: string; evidence?: Record<string, unknown> };
+  assert.equal(followed.rating, "warn");
+  // informational only: it can never move the score
+  assert.equal(DETECTOR_WEIGHTS.verifyProbe, 0);
 });
 
 test("idle user (no interaction) → every behavioral detector inconclusive → verdict incomplete", () => {
