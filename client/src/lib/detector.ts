@@ -223,6 +223,13 @@ export interface VerifyProbeState {
   slider: { samples: { x: number; y: number; t: number; trusted: boolean }[]; startedAt: number; releasedAt: number };
   /** activations of the accessibility-only fallback control */
   fallbackClicks: { t: number; trusted: boolean; via: "pointer" | "keyboard-or-script" }[];
+  /** required still time (ms) before a round is judged — same rule as the rotation puzzle */
+  holdMs: number;
+  /** rounds dealt so far; a new picture is dealt after each failed round */
+  attempts: number;
+  /** the piece sat in the gap when the countdown ended */
+  passed: boolean;
+  passedAt: number;
 }
 
 export interface PuzzleRotateState {

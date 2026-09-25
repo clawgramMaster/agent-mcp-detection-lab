@@ -778,6 +778,13 @@ label {
   font-size: 14px;
   pointer-events: none;
 }
+.vf-ok .vf-fill {
+  background: #dcefe3;
+}
+.vf-ok .vf-text {
+  color: #1f5c3a;
+  font-weight: 600;
+}
 .vf-handle {
   position: absolute;
   top: -1px;

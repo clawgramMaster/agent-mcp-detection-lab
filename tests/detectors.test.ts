@@ -1113,7 +1113,15 @@ test("bar-rotate puzzle: untrusted/instant → fail; linear ramp / regular timer
 });
 
 test("verify probe: untouched → inconclusive; slider only → pass; untrusted slide / hidden-text click → warn; weight 0", () => {
-  const base = { shownAt: 0, slider: { samples: [], startedAt: 0, releasedAt: 0 }, fallbackClicks: [] };
+  const base = {
+    shownAt: 0,
+    slider: { samples: [], startedAt: 0, releasedAt: 0 },
+    fallbackClicks: [],
+    holdMs: 1500,
+    attempts: 1,
+    passed: false,
+    passedAt: 0,
+  };
   assert.equal((verifyProbe.run(mkCtx()) as { rating: string }).rating, "inconclusive");
   assert.equal((verifyProbe.run(mkCtx({ verifyProbe: base })) as { rating: string }).rating, "inconclusive");
   const human = verifyProbe.run(
@@ -1134,6 +1142,29 @@ test("verify probe: untouched → inconclusive; slider only → pass; untrusted 
     }),
   ) as { rating: string };
   assert.equal(human.rating, "pass");
+  const solved = verifyProbe.run(
+    mkCtx({
+      verifyProbe: {
+        ...base,
+        attempts: 2,
+        passed: true,
+        passedAt: 5000,
+        slider: {
+          samples: Array.from({ length: 12 }, (_, i) => ({
+            x: 100 + i * 9,
+            y: 300 + (i % 3),
+            t: i * 30,
+            trusted: true,
+          })),
+          startedAt: 0,
+          releasedAt: 400,
+        },
+      },
+    }),
+  ) as { rating: string; evidence?: Record<string, unknown> };
+  assert.equal(solved.rating, "pass");
+  assert.equal(solved.evidence?.passed, true);
+  assert.equal(solved.evidence?.attempts, 2);
   const synthetic = verifyProbe.run(
     mkCtx({
       verifyProbe: {

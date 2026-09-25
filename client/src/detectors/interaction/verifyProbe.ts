@@ -31,6 +31,9 @@ export const verifyProbe: Detector = {
       sliderUntrusted: untrustedSlide,
       sliderMs: slid > 0 ? Math.round(s.slider.releasedAt - s.slider.startedAt) : 0,
       fallbackClicks: fallback.length,
+      attempts: s.attempts,
+      passed: s.passed,
+      holdMs: s.holdMs,
     };
 
     if (fallback.length > 0) {

@@ -1307,21 +1307,33 @@ export function renderHome(root: HTMLElement) {
     el("label", { class: "step2-label" }, "Paste destination", clipboardDestination),
   );
 
-  // ---- Decoy: a slider-CAPTCHA look-alike ("please slide to verify"). It verifies nothing and no step
-  // depends on it. Beside the slider is text that exists only in the accessibility tree / DOM: a
-  // visually hidden "please sign in to verify" note with a "Sign in to verify" button. We record
-  // whether a session touches the slider and whether it follows that text (informational only).
+  // ---- Human-verification look-alike ("please slide to verify"): drag the bar so the piece fills the
+  // gap. It has the same pass rule as the rotation puzzle (Step 1b): move the bar, stop, and a
+  // PZ_HOLD_MS countdown starts; moving again resets it; when it ends the piece must sit in the gap
+  // (else a new picture is dealt). No numbered step depends on it. Beside the slider is text that
+  // exists only in the accessibility tree / DOM: a visually hidden "please sign in to verify" note
+  // with a "Sign in to verify" button. We record whether a session touches the slider, whether it
+  // solves it, and whether it follows that text (informational only).
   ctx.verifyProbe = {
     shownAt: performance.now(),
     slider: { samples: [], startedAt: 0, releasedAt: 0 },
     fallbackClicks: [],
+    holdMs: PZ_HOLD_MS,
+    attempts: 1,
+    passed: false,
+    passedAt: 0,
   };
   const VF_W = 320;
   const VF_H = 160;
   const VF_PIECE = 56;
-  const vfScene = PUZZLE_SCENES[randomInt(PUZZLE_SCENES.length)];
-  const vfGapX = 110 + randomInt(VF_W - VF_PIECE - 130);
-  const vfGapY = 24 + randomInt(VF_H - VF_PIECE - 48);
+  const VF_TOL = 4; // px between the piece and the gap
+  const VF_HANDLE = 56;
+  const VF_TRAVEL = VF_W - VF_HANDLE;
+  let vfScene = PUZZLE_SCENES[randomInt(PUZZLE_SCENES.length)];
+  let vfGapX = 110 + randomInt(VF_W - VF_PIECE - 130);
+  let vfGapY = 24 + randomInt(VF_H - VF_PIECE - 48);
+  let vfHandleX = 0;
+  let vfLoadToken = 0;
   const vfImage = document.createElement("canvas");
   vfImage.width = VF_W * 2;
   vfImage.height = VF_H * 2;
@@ -1330,35 +1342,42 @@ export function renderHome(root: HTMLElement) {
   vfPiece.width = VF_PIECE * 2;
   vfPiece.height = VF_PIECE * 2;
   vfPiece.className = "vf-piece";
-  vfPiece.style.top = `${vfGapY}px`;
-  const vfPhoto = new Image();
-  vfPhoto.onload = () => {
-    const g = vfImage.getContext("2d");
-    const pg = vfPiece.getContext("2d");
-    if (!g || !pg) return;
-    // cover-fit the photo, then cut the piece out of it and dim the hole it leaves behind
-    const scale = Math.max(vfImage.width / vfPhoto.width, vfImage.height / vfPhoto.height);
-    const dw = vfPhoto.width * scale;
-    const dh = vfPhoto.height * scale;
-    g.drawImage(vfPhoto, (vfImage.width - dw) / 2, (vfImage.height - dh) / 2, dw, dh);
-    const r = VF_PIECE;
-    pg.save();
-    pg.beginPath();
-    pg.arc(r, r, r - 2, 0, Math.PI * 2);
-    pg.clip();
-    pg.drawImage(vfImage, vfGapX * 2, vfGapY * 2, r * 2, r * 2, 0, 0, r * 2, r * 2);
-    pg.restore();
-    pg.lineWidth = 4;
-    pg.strokeStyle = "rgba(255,255,255,0.95)";
-    pg.beginPath();
-    pg.arc(r, r, r - 3, 0, Math.PI * 2);
-    pg.stroke();
-    g.beginPath();
-    g.arc(vfGapX * 2 + r, vfGapY * 2 + r, r - 2, 0, Math.PI * 2);
-    g.fillStyle = "rgba(255,255,255,0.72)";
-    g.fill();
+  // (Re)draw the round: photo with a dimmed hole, and the piece cut out of that spot.
+  const vfRender = () => {
+    const token = ++vfLoadToken;
+    vfPiece.style.top = `${vfGapY}px`;
+    vfPiece.getContext("2d")?.clearRect(0, 0, vfPiece.width, vfPiece.height);
+    const photo = new Image();
+    photo.onload = () => {
+      if (token !== vfLoadToken) return; // a newer round superseded this one
+      const g = vfImage.getContext("2d");
+      const pg = vfPiece.getContext("2d");
+      if (!g || !pg) return;
+      g.clearRect(0, 0, vfImage.width, vfImage.height);
+      // cover-fit the photo, then cut the piece out of it and dim the hole it leaves behind
+      const scale = Math.max(vfImage.width / photo.width, vfImage.height / photo.height);
+      const dw = photo.width * scale;
+      const dh = photo.height * scale;
+      g.drawImage(photo, (vfImage.width - dw) / 2, (vfImage.height - dh) / 2, dw, dh);
+      const r = VF_PIECE;
+      pg.save();
+      pg.beginPath();
+      pg.arc(r, r, r - 2, 0, Math.PI * 2);
+      pg.clip();
+      pg.drawImage(vfImage, vfGapX * 2, vfGapY * 2, r * 2, r * 2, 0, 0, r * 2, r * 2);
+      pg.restore();
+      pg.lineWidth = 4;
+      pg.strokeStyle = "rgba(255,255,255,0.95)";
+      pg.beginPath();
+      pg.arc(r, r, r - 3, 0, Math.PI * 2);
+      pg.stroke();
+      g.beginPath();
+      g.arc(vfGapX * 2 + r, vfGapY * 2 + r, r - 2, 0, Math.PI * 2);
+      g.fillStyle = "rgba(255,255,255,0.72)";
+      g.fill();
+    };
+    photo.src = `/puzzle/${vfScene.file}`;
   };
-  vfPhoto.src = `/puzzle/${vfScene.file}`;
   const vfTitle = el("div", { class: "vf-title" }, "Verify you are human");
   const vfRefresh = el("span", { class: "vf-refresh", "aria-hidden": "true" }, "\u21bb");
   const vfFrame = el("div", { class: "vf-frame" }, vfImage, vfPiece, vfRefresh);
@@ -1390,37 +1409,87 @@ export function renderHome(root: HTMLElement) {
     vfNote,
     vfFallback,
   );
-  const VF_TRAVEL = VF_W - 56;
-  let vfDragging = false;
-  let vfGrabDx = 0;
+  const vfPieceX = () => (vfHandleX / VF_TRAVEL) * (VF_W - VF_PIECE);
   const vfMove = (handleX: number) => {
+    vfHandleX = handleX;
     vfHandle.style.left = `${handleX}px`;
-    vfFill.style.width = `${handleX + 28}px`;
-    vfPiece.style.left = `${(handleX / VF_TRAVEL) * (VF_W - VF_PIECE)}px`;
+    vfFill.style.width = `${handleX + VF_HANDLE / 2}px`;
+    vfPiece.style.left = `${vfPieceX()}px`;
   };
   vfMove(0);
+  vfRender();
+  const vfAligned = () => Math.abs(vfPieceX() - vfGapX) <= VF_TOL;
+  let vfStopTimer = 0;
+  let vfHoldTimer = 0;
+  let vfDragging = false;
+  let vfGrabDx = 0;
+  const vfCancelHold = () => {
+    window.clearTimeout(vfStopTimer);
+    window.clearTimeout(vfHoldTimer);
+    vfStopTimer = 0;
+    vfHoldTimer = 0;
+  };
+  // A failed round (countdown ended with the piece outside the gap) deals a new picture, gap and
+  // start position, and restarts the telemetry — same as the rotation puzzle.
+  const vfReroll = () => {
+    const probe = ctx.verifyProbe;
+    if (!probe || probe.passed) return;
+    const others = PUZZLE_SCENES.filter((x) => x.file !== vfScene.file);
+    vfScene = others[randomInt(others.length)];
+    vfGapX = 110 + randomInt(VF_W - VF_PIECE - 130);
+    vfGapY = 24 + randomInt(VF_H - VF_PIECE - 48);
+    vfDragging = false; // the grip is lost; the handle must be grabbed again
+    probe.attempts += 1;
+    probe.slider = { samples: [], startedAt: 0, releasedAt: 0 };
+    vfMove(0);
+    vfRender();
+    vfText.textContent = "Please slide to verify";
+    vfText.style.visibility = "visible";
+  };
+  const vfStartCountdown = () => {
+    vfStopTimer = 0;
+    vfText.textContent = "Verifying…";
+    vfText.style.visibility = "visible";
+    vfHoldTimer = window.setTimeout(() => {
+      vfHoldTimer = 0;
+      const probe = ctx.verifyProbe;
+      if (!probe || probe.passed) return;
+      if (vfAligned()) {
+        probe.passed = true;
+        probe.passedAt = performance.now();
+        vfDragging = false;
+        vfBox.classList.add("vf-ok");
+        vfText.textContent = "Verification passed";
+      } else {
+        vfText.textContent = "Verification failed, please try again";
+        window.setTimeout(vfReroll, 900);
+      }
+    }, PZ_HOLD_MS);
+  };
   vfHandle.addEventListener("pointerdown", (e) => {
+    if (ctx.verifyProbe?.passed) return;
     vfDragging = true;
     vfGrabDx = e.clientX - vfHandle.getBoundingClientRect().left;
     vfHandle.setPointerCapture(e.pointerId);
     const sl = ctx.verifyProbe?.slider;
     if (sl && sl.startedAt === 0) sl.startedAt = performance.now();
-    vfText.style.visibility = "hidden";
     e.preventDefault();
   });
   vfHandle.addEventListener("pointermove", (e) => {
-    if (!vfDragging) return;
+    if (!vfDragging || ctx.verifyProbe?.passed) return;
     const x = Math.max(0, Math.min(VF_TRAVEL, e.clientX - vfBar.getBoundingClientRect().left - vfGrabDx));
     vfMove(x);
     ctx.verifyProbe?.slider.samples.push({ x: e.clientX, y: e.clientY, t: performance.now(), trusted: e.isTrusted });
+    // moving resets the countdown; it (re)starts once the handle has been still for PZ_STOP_MS
+    vfCancelHold();
+    vfText.style.visibility = "hidden";
+    vfStopTimer = window.setTimeout(vfStartCountdown, PZ_STOP_MS);
   });
   const vfRelease = () => {
     if (!vfDragging) return;
     vfDragging = false;
     const sl = ctx.verifyProbe?.slider;
     if (sl) sl.releasedAt = performance.now();
-    vfMove(0); // nothing is verified: it just snaps back
-    vfText.style.visibility = "visible";
   };
   vfHandle.addEventListener("pointerup", vfRelease);
   vfHandle.addEventListener("pointercancel", vfRelease);
