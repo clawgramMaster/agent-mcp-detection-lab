@@ -1151,7 +1151,7 @@ test("verify probe: untouched → inconclusive; slider only → pass; untrusted 
   assert.equal(DETECTOR_WEIGHTS.verifyProbe, 0);
 });
 
-test("task competence: counts completed tasks, small credit loss for retries/mistakes, groups cover all 11 steps", () => {
+test("task competence: counts completed tasks, small credit loss for retries/mistakes, groups cover all 11 tasks in 5 steps", () => {
   const none = computeCompetence(mkCtx());
   assert.equal(none.score, 0);
   assert.equal(none.completed, 0);
@@ -1162,9 +1162,13 @@ test("task competence: counts completed tasks, small credit loss for retries/mis
   const groups = new Set(TASK_GROUPS.map((g) => g.id));
   assert.ok(none.tasks.every((t) => groups.has(t.group)));
   assert.deepEqual(
-    none.tasks.map((t) => t.step),
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    none.tasks.map((t) => t.id),
+    ["1a", "1b", "1c", "2a", "2b", "3a", "3b", "4a", "4b", "5a", "5b"],
   );
+  assert.equal(none.stepsTotal, 5);
+  assert.equal(none.stepsCompleted, 0);
+  // each step card declares exactly as many tasks as it holds
+  for (const g of TASK_GROUPS) assert.equal(none.tasks.filter((t) => t.group === g.id).length, g.tasks);
 
   const clean = computeCompetence(
     mkCtx({

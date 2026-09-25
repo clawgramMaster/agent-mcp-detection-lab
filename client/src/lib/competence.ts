@@ -3,7 +3,7 @@ import type { DetectorCtx } from "./detector";
 /**
  * Task competence: how well the challenge tasks were actually performed. This is separate from
  * the bot score. Scoring rules:
- *  - every task is worth the same;
+ *  - every task is worth the same (11 tasks, grouped into 5 steps);
  *  - a task counts only when it is completed correctly (unfinished or unattempted = 0);
  *  - a completed task can lose a little credit for retries or mistakes when we can measure them
  *    (Step 2: extra rounds, Step 3: wrong taps), never below 40 % of its value.
@@ -11,21 +11,25 @@ import type { DetectorCtx } from "./detector";
  */
 export interface TaskGroup {
   id: string;
+  /** step number shown on the page; its tasks are 1a, 1b, ... */
+  number: number;
   title: string;
-  steps: string;
+  /** how many tasks the step holds */
+  tasks: number;
 }
 
-/** Contiguous steps grouped into cards, in page order (step numbers are unchanged). */
+/** A step is one card that can hold several related tasks (1a, 1b, ...), in page order. */
 export const TASK_GROUPS: TaskGroup[] = [
-  { id: "pointer", title: "Pointer tasks", steps: "Steps 1–3" },
-  { id: "input", title: "Form & frame input", steps: "Steps 4–5" },
-  { id: "click", title: "Clicks & tabs", steps: "Steps 6–7" },
-  { id: "hover", title: "Hover menus", steps: "Steps 8–9" },
-  { id: "select", title: "Select & clipboard", steps: "Steps 10–11" },
+  { id: "pointer", number: 1, title: "Pointer tasks", tasks: 3 },
+  { id: "input", number: 2, title: "Form & frame input", tasks: 2 },
+  { id: "click", number: 3, title: "Clicks & tabs", tasks: 2 },
+  { id: "hover", number: 4, title: "Hover menus", tasks: 2 },
+  { id: "select", number: 5, title: "Select & clipboard", tasks: 2 },
 ];
 
 export interface CompetenceTask {
-  step: number;
+  /** task id: step number + letter, e.g. "1b" */
+  id: string;
   group: string;
   label: string;
   completed: boolean;
@@ -39,6 +43,9 @@ export interface Competence {
   score: number;
   completed: number;
   total: number;
+  /** steps (groups) whose tasks are all completed */
+  stepsCompleted: number;
+  stepsTotal: number;
   tasks: CompetenceTask[];
 }
 
@@ -47,14 +54,14 @@ const clampCredit = (n: number) => Math.max(MIN_CREDIT, Math.min(1, n));
 
 export function computeCompetence(ctx: DetectorCtx): Competence {
   const done = (
-    step: number,
+    id: string,
     group: string,
     label: string,
     completed: boolean | undefined,
     quality = 1,
     note?: string,
   ): CompetenceTask => ({
-    step,
+    id,
     group,
     label,
     completed: !!completed,
@@ -65,9 +72,9 @@ export function computeCompetence(ctx: DetectorCtx): Competence {
   const attempts = ctx.puzzleRotate?.attempts ?? 1;
   const wrong = ctx.keypad?.wrongClicks ?? 0;
   const tasks: CompetenceTask[] = [
-    done(1, "pointer", "Value slider", ctx.slider?.completed),
+    done("1a", "pointer", "Value slider", ctx.slider?.completed),
     done(
-      2,
+      "1b",
       "pointer",
       "Rotate the circle upright",
       ctx.puzzleRotate?.completed,
@@ -75,23 +82,34 @@ export function computeCompetence(ctx: DetectorCtx): Competence {
       attempts > 1 ? `${attempts} rounds needed` : undefined,
     ),
     done(
-      3,
+      "1c",
       "pointer",
       "Keypad PIN",
       ctx.keypad?.completed,
       1 - 0.15 * wrong,
       wrong > 0 ? `${wrong} wrong tap${wrong > 1 ? "s" : ""}` : undefined,
     ),
-    done(4, "input", "Credentials", ctx.credentials?.complete),
-    done(5, "input", "Nested certificate iframe", ctx.iframeInput?.complete && ctx.iframeInput.blurred),
-    done(6, "click", "DOM-churn click", ctx.detachedClick?.completed),
-    done(7, "click", "Verification tab", ctx.popupCheck?.completed),
-    done(8, "hover", "In-page hover menu", ctx.inPageHoverMenu?.completed),
-    done(9, "hover", "Iframe hover menu", ctx.hoverMenu?.completed),
-    done(10, "select", "Native select", ctx.nativeSelect?.complete),
-    done(11, "select", "Copy & paste token", ctx.clipboardTransfer?.completed),
+    done("2a", "input", "Credentials", ctx.credentials?.complete),
+    done("2b", "input", "Nested certificate iframe", ctx.iframeInput?.complete && ctx.iframeInput.blurred),
+    done("3a", "click", "DOM-churn click", ctx.detachedClick?.completed),
+    done("3b", "click", "Verification tab", ctx.popupCheck?.completed),
+    done("4a", "hover", "In-page hover menu", ctx.inPageHoverMenu?.completed),
+    done("4b", "hover", "Iframe hover menu", ctx.hoverMenu?.completed),
+    done("5a", "select", "Native select", ctx.nativeSelect?.complete),
+    done("5b", "select", "Copy & paste token", ctx.clipboardTransfer?.completed),
   ];
   const completed = tasks.filter((t) => t.completed).length;
   const credit = tasks.reduce((sum, t) => sum + t.credit, 0);
-  return { score: Math.round((100 * credit) / tasks.length), completed, total: tasks.length, tasks };
+  const stepsCompleted = TASK_GROUPS.filter((g) => {
+    const mine = tasks.filter((t) => t.group === g.id);
+    return mine.length > 0 && mine.every((t) => t.completed);
+  }).length;
+  return {
+    score: Math.round((100 * credit) / tasks.length),
+    completed,
+    total: tasks.length,
+    stepsCompleted,
+    stepsTotal: TASK_GROUPS.length,
+    tasks,
+  };
 }

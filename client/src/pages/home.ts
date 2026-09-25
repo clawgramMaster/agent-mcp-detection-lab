@@ -241,10 +241,10 @@ export function renderHome(root: HTMLElement) {
 
   const randomInt = (upperBound: number) => crypto.getRandomValues(new Uint32Array(1))[0] % upperBound;
 
-  // ---- Step 1: slider drag to a target ----
+  // ---- Step 1a: slider drag to a target ----
   const sliderTarget = 60 + randomInt(25); // 60–84
   ctx.slider = { target: sliderTarget, value: 0, samples: [], startedAt: 0, releasedAt: 0, completed: false };
-  const sliderStatus = el("div", { class: "status" }, `Step 1 — drag the slider to exactly ${sliderTarget}.`);
+  const sliderStatus = el("div", { class: "status" }, `Step 1a — drag the slider to exactly ${sliderTarget}.`);
   const sliderInput = el("input", {
     type: "range",
     min: "0",
@@ -277,8 +277,8 @@ export function renderHome(root: HTMLElement) {
     // completed only if the FINAL resting value equals the target
     s.completed = s.value === s.target;
     sliderStatus.textContent = s.completed
-      ? `Step 1 done — landed on ${s.target}.`
-      : `Step 1 — drag the slider to exactly ${s.target}. (now ${s.value})`;
+      ? `Step 1a done — landed on ${s.target}.`
+      : `Step 1a — drag the slider to exactly ${s.target}. (now ${s.value})`;
   };
   sliderInput.addEventListener("pointerdown", onSliderStart);
   sliderInput.addEventListener("input", onSliderInput);
@@ -286,7 +286,7 @@ export function renderHome(root: HTMLElement) {
   sliderInput.addEventListener("change", onSliderRelease);
   const sliderRow = el("div", { class: "slider-row" }, sliderInput, sliderVal);
 
-  // ---- Step 2: bar-rotate puzzle — a circle cut out of a random picture; slide the bar to turn it upright and hold ----
+  // ---- Step 1b: bar-rotate puzzle — a circle cut out of a random picture; slide the bar to turn it upright and hold ----
   const PZ_W = 360;
   const PZ_H = 240;
   const PZ_R = 46; // cut-out radius
@@ -348,7 +348,7 @@ export function renderHome(root: HTMLElement) {
   const pzStatus = el(
     "div",
     { class: "status" },
-    "Step 2 — slide the bar (or scroll over the picture) to turn the circle upright, then stop and hold still.",
+    "Step 1b — slide the bar (or scroll over the picture) to turn the circle upright, then stop and hold still.",
   );
   const pzImage = document.createElement("canvas");
   pzImage.width = PZ_W * 2;
@@ -468,7 +468,7 @@ export function renderHome(root: HTMLElement) {
     s.attempts = pzAttempts;
     pzRender();
     pzStatus.textContent =
-      "Step 2 — the circle was not upright, so the picture changed. Slide the bar to turn the new circle upright, then stop.";
+      "Step 1b — the circle was not upright, so the picture changed. Slide the bar to turn the new circle upright, then stop.";
   };
   // The bar is the main control: handle position (0..PZ_TRAVEL px) maps linearly onto one
   // full turn (0..360°) added to the initial angle. The wheel over the picture just nudges the
@@ -486,10 +486,10 @@ export function renderHome(root: HTMLElement) {
     s.samples.push({ t: performance.now(), dy: dx, angle: s.angle, trusted, x: px, y: py, src });
     // moving resets the countdown; it (re)starts only once the bar has stopped
     pzCancelHold();
-    pzStatus.textContent = "Step 2 — turn the circle upright, then stop the bar and hold still.";
+    pzStatus.textContent = "Step 1b — turn the circle upright, then stop the bar and hold still.";
     pzStopTimer = window.setTimeout(() => {
       pzStopTimer = 0;
-      pzStatus.textContent = "Step 2 — hold still… checking in a moment.";
+      pzStatus.textContent = "Step 1b — hold still… checking in a moment.";
       void pzProgress.offsetWidth; // flush the reset so the fill animates from 0
       pzProgress.style.transition = `width ${PZ_HOLD_MS}ms linear`;
       pzProgress.style.width = "100%";
@@ -500,7 +500,7 @@ export function renderHome(root: HTMLElement) {
           s.completed = true;
           s.completedAt = performance.now();
           pzBox.classList.add("pz-ok");
-          pzStatus.textContent = "Step 2 done — the circle fits.";
+          pzStatus.textContent = "Step 1b done — the circle fits.";
         } else {
           pzCancelHold();
           pzReroll();
@@ -539,7 +539,7 @@ export function renderHome(root: HTMLElement) {
     { passive: false },
   );
 
-  // ---- Step 3: virtual security keypad — click-to-enter PIN, no keyboard ----
+  // ---- Step 1c: virtual security keypad — click-to-enter PIN, no keyboard ----
   // Mirrors real bank / cert-auth "secure keypads": clicking a masked PIN field
   // pops up a small floating panel (not an inline page section) containing a
   // CLOSED shadow-root keypad (see the `shadowDomIntegrity` passive check) so
@@ -563,7 +563,7 @@ export function renderHome(root: HTMLElement) {
   const keypadStatus = el(
     "div",
     { class: "status" },
-    `Step 3 — click "Enter PIN" to open the popup keypad and enter ${keypadPin.join(" ")} (mouse only — no typing). The keypad layout reshuffles after every tap, so re-check digit positions before each click.`,
+    `Step 1c — click "Enter PIN" to open the popup keypad and enter ${keypadPin.join(" ")} (mouse only — no typing). The keypad layout reshuffles after every tap, so re-check digit positions before each click.`,
   );
   const pinDots: HTMLElement[] = [];
   const keypadPinRow = el("div", { class: "keypad-pin" });
@@ -650,8 +650,8 @@ export function renderHome(root: HTMLElement) {
       keypadOpenBtn.disabled = true;
       keypadOpenBtn.textContent = "PIN entered";
       keypadStatus.textContent = k.correct
-        ? "Step 3 done — continue to Step 4."
-        : "Step 3 done (with wrong taps) — continue to Step 4.";
+        ? "Step 1c done — continue to Step 2a."
+        : "Step 1c done (with wrong taps) — continue to Step 2a.";
       keypadCloseTimer = window.setTimeout(closeKeypadPopup, 350); // real secure-keypad popups auto-dismiss on completion
     } else {
       k.shuffles++;
@@ -682,7 +682,7 @@ export function renderHome(root: HTMLElement) {
   }
   renderKeypadLayout();
 
-  // ---- Step 5: trusted typing into a nested controlled iframe ----
+  // ---- Step 2b: trusted typing into a nested controlled iframe ----
   const phoneSuffix = String(crypto.getRandomValues(new Uint32Array(1))[0] % 100_000_000).padStart(8, "0");
   const expectedPhoneDigits = `010${phoneSuffix}`;
   const expectedPhoneValue = `${expectedPhoneDigits.slice(0, 3)}-${expectedPhoneDigits.slice(3, 7)}-${expectedPhoneDigits.slice(7)}`;
@@ -713,7 +713,7 @@ export function renderHome(root: HTMLElement) {
   const iframeTask = el(
     "div",
     { class: "iframe-task" },
-    el("div", { class: "step2-label" }, "Step 5 — Nested certificate mobile verification"),
+    el("div", { class: "step2-label" }, "Step 2b — Nested certificate mobile verification"),
     iframeStatus,
     certificateFrame,
   );
@@ -759,13 +759,13 @@ export function renderHome(root: HTMLElement) {
     const done = state.complete && state.blurred;
     iframeStatus.className = `iframe-task-status${done ? " iframe-task-pass" : ""}`;
     iframeStatus.textContent = done
-      ? `Step 5 done — controlled state retained ${state.controlledValue} after blur · trusted inputs=${state.trustedInputEvents} · trusted clicks=${state.trustedClickEvents}.`
-      : `Step 5 — state=${state.controlledValue || "empty"} · trusted inputs=${state.trustedInputEvents} · untrusted inputs=${state.untrustedInputEvents} · trusted clicks=${state.trustedClickEvents} · untrusted clicks=${state.untrustedClickEvents}`;
+      ? `Step 2b done — controlled state retained ${state.controlledValue} after blur · trusted inputs=${state.trustedInputEvents} · trusted clicks=${state.trustedClickEvents}.`
+      : `Step 2b — state=${state.controlledValue || "empty"} · trusted inputs=${state.trustedInputEvents} · untrusted inputs=${state.untrustedInputEvents} · trusted clicks=${state.trustedClickEvents} · untrusted clicks=${state.untrustedClickEvents}`;
   };
   window.addEventListener("message", onIframeMessage);
 
-  // ---- Step 4: credentials must match a specific, freshly generated value ----
-  // Mirrors the Step 5 (phone digits) / Step 10 (select value) pattern: a random
+  // ---- Step 2a: credentials must match a specific, freshly generated value ----
+  // Mirrors the Step 2b (phone digits) / Step 5a (select value) pattern: a random
   // target is generated and shown on screen, and only typing it EXACTLY counts —
   // "type anything" would let a bot autofill/paste a fixed string and pass.
   const PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -785,7 +785,7 @@ export function renderHome(root: HTMLElement) {
   const credentialsStatus = el(
     "div",
     { class: "status" },
-    `Step 4 — type this email and password exactly: ${expectedEmail} / ${expectedPassword}`,
+    `Step 2a — type this email and password exactly: ${expectedEmail} / ${expectedPassword}`,
   );
 
   const form = el("form", { id: "behavior-form", class: "login-form", autocomplete: "off" }) as HTMLFormElement;
@@ -838,8 +838,8 @@ export function renderHome(root: HTMLElement) {
     c.complete = user.value === c.expectedEmail && pass.value === c.expectedPassword;
     credentialsStatus.className = c.complete ? "status iframe-task-pass" : "status";
     credentialsStatus.textContent = c.complete
-      ? "Step 4 done — credentials matched."
-      : `Step 4 — type this email and password exactly: ${c.expectedEmail} / ${c.expectedPassword}`;
+      ? "Step 2a done — credentials matched."
+      : `Step 2a — type this email and password exactly: ${c.expectedEmail} / ${c.expectedPassword}`;
     return c.complete;
   };
   user.addEventListener("input", onCredentialsInput);
@@ -872,7 +872,7 @@ export function renderHome(root: HTMLElement) {
   ) as HTMLButtonElement;
   form.append(el("label", {}, "Username", user), el("label", {}, "Password", pass), hpField, hpButton);
 
-  // ---- Step 6: DOM-churn click test ----
+  // ---- Step 3a: DOM-churn click test ----
   // The button is silently replaced by a look-alike node partway through. A
   // real pointer can only ever hit what's currently on screen; a script
   // holding a stale element handle and calling .click() on it can "hit" a
@@ -886,7 +886,7 @@ export function renderHome(root: HTMLElement) {
     replacementTrusted: false,
     completed: false,
   };
-  const bonusClickStatus = el("div", { class: "status" }, "Step 6 — click the button below.");
+  const bonusClickStatus = el("div", { class: "status" }, "Step 3a — click the button below.");
   let bonusBtn = el("button", { type: "button", class: "btn-secondary" }, "Click me") as HTMLButtonElement;
   const bonusClickRow = el("div", { class: "bonus-row" }, bonusBtn);
   const onBonusClick = (isReplacement: boolean) => (e: MouseEvent) => {
@@ -902,7 +902,7 @@ export function renderHome(root: HTMLElement) {
       d.originalClickedAfterSwap = d.swappedAt > 0 && now >= d.swappedAt;
     }
     d.completed = true;
-    bonusClickStatus.textContent = "Step 6 done — continue to Step 7.";
+    bonusClickStatus.textContent = "Step 3a done — continue to Step 3b.";
   };
   bonusBtn.addEventListener("click", onBonusClick(false));
   const detachedSwapTimer = window.setTimeout(() => {
@@ -915,7 +915,7 @@ export function renderHome(root: HTMLElement) {
     bonusBtn = replacement;
   }, 500 + randomInt(400));
 
-  // ---- Step 7: popup window.opener / referrer integrity ----
+  // ---- Step 3b: popup window.opener / referrer integrity ----
   const popupChallengeId = crypto.randomUUID();
   ctx.popupCheck = {
     challengeId: popupChallengeId,
@@ -927,7 +927,7 @@ export function renderHome(root: HTMLElement) {
     referrerNonEmpty: null,
     referrerOriginMatches: null,
   };
-  const popupStatus = el("div", { class: "status" }, "Step 7 — open the verification tab (target=_blank).");
+  const popupStatus = el("div", { class: "status" }, "Step 3b — open the verification tab (target=_blank).");
   const popupParams = new URLSearchParams({ challengeId: popupChallengeId });
   const popupLink = el(
     "a",
@@ -962,11 +962,11 @@ export function renderHome(root: HTMLElement) {
       } catch {
         p.referrerOriginMatches = false;
       }
-      popupStatus.textContent = `Step 7 done — opener=${p.openerPresent}, referrer=${p.referrerNonEmpty}.`;
+      popupStatus.textContent = `Step 3b done — opener=${p.openerPresent}, referrer=${p.referrerNonEmpty}.`;
     };
   }
 
-  // ---- Step 9: iframe + closed Shadow DOM hover menu ----
+  // ---- Step 4b: iframe + closed Shadow DOM hover menu ----
   // The interaction surface crosses an iframe boundary, then hides its menu
   // inside a closed shadow root. Only postMessage telemetry from the expected
   // origin, frame window, and per-run challenge is accepted back here.
@@ -1007,7 +1007,7 @@ export function renderHome(root: HTMLElement) {
   const hoverMenuTask = el(
     "div",
     { class: "iframe-task" },
-    el("div", { class: "step2-label" }, "Step 9 — Iframe Shadow DOM hover menu"),
+    el("div", { class: "step2-label" }, "Step 4b — Iframe Shadow DOM hover menu"),
     hoverMenuStatus,
     hoverFrame,
   );
@@ -1036,7 +1036,7 @@ export function renderHome(root: HTMLElement) {
     h.completed = data.selectedOption === h.expectedOption;
     hoverMenuStatus.className = h.completed ? "iframe-task-status iframe-task-pass" : "iframe-task-status";
     hoverMenuStatus.textContent = h.completed
-      ? `Step 9 done — selected "${data.selectedOption}" through the iframe Shadow DOM.`
+      ? `Step 4b done — selected "${data.selectedOption}" through the iframe Shadow DOM.`
       : `"${data.selectedOption}" is not the requested option. Hover again and choose "${h.expectedOption}".`;
     if (!h.completed) {
       h.openedAt = 0;
@@ -1049,7 +1049,7 @@ export function renderHome(root: HTMLElement) {
   };
   window.addEventListener("message", onHoverFrameMessage);
 
-  // ---- Step 8: in-page closed Shadow DOM hover menu ----
+  // ---- Step 4a: in-page closed Shadow DOM hover menu ----
   const inPageExpectedHoverOption = HOVER_MENU_OPTIONS[randomInt(HOVER_MENU_OPTIONS.length)];
   ctx.inPageHoverMenu = {
     options: HOVER_MENU_OPTIONS,
@@ -1150,7 +1150,7 @@ export function renderHome(root: HTMLElement) {
       state.completed = option === state.expectedOption;
       inPageHoverStatus.className = state.completed ? "iframe-task-status iframe-task-pass" : "iframe-task-status";
       inPageHoverStatus.textContent = state.completed
-        ? `Step 8 done — selected "${option}" in the page Shadow DOM.`
+        ? `Step 4a done — selected "${option}" in the page Shadow DOM.`
         : `"${option}" is not the requested option. Hover again and choose "${state.expectedOption}".`;
       closeInPageHoverMenu();
       if (state.completed) {
@@ -1164,12 +1164,12 @@ export function renderHome(root: HTMLElement) {
   const inPageHoverTask = el(
     "div",
     { class: "iframe-task" },
-    el("div", { class: "step2-label" }, "Step 8 — In-page Shadow DOM hover menu"),
+    el("div", { class: "step2-label" }, "Step 4a — In-page Shadow DOM hover menu"),
     inPageHoverStatus,
     inPageHoverHost,
   );
 
-  // ---- Step 10: native select must be changed through trusted input ----
+  // ---- Step 5a: native select must be changed through trusted input ----
   const expectedSelectValue = "wire";
   ctx.nativeSelect = {
     expectedValue: expectedSelectValue,
@@ -1182,7 +1182,7 @@ export function renderHome(root: HTMLElement) {
   const nativeSelectStatus = el(
     "div",
     { class: "status", id: "nativeSelectStatus" },
-    "Step 10 — choose “Wire transfer” from the native Settlement method dropdown.",
+    "Step 5a — choose “Wire transfer” from the native Settlement method dropdown.",
   );
   const nativeSelect = el("select", {
     id: "trustedSelect",
@@ -1208,13 +1208,13 @@ export function renderHome(root: HTMLElement) {
     if (event.type === "change") state.changeTrusted = event.isTrusted;
     state.complete = state.value === state.expectedValue;
     nativeSelectStatus.className = state.complete ? "status iframe-task-pass" : "status";
-    nativeSelectStatus.textContent = `Step 10 — value=${state.value || "empty"} · input trusted=${String(state.inputTrusted)} · change trusted=${String(state.changeTrusted)}`;
+    nativeSelectStatus.textContent = `Step 5a — value=${state.value || "empty"} · input trusted=${String(state.inputTrusted)} · change trusted=${String(state.changeTrusted)}`;
   };
   nativeSelect.addEventListener("input", onNativeSelect);
   nativeSelect.addEventListener("change", onNativeSelect);
-  const nativeSelectTask = el("label", { class: "step2-label" }, "Step 10 — Native settlement method", nativeSelect);
+  const nativeSelectTask = el("label", { class: "step2-label" }, "Step 5a — Native settlement method", nativeSelect);
 
-  // ---- Step 11: explicit trusted copy/paste transfer ----
+  // ---- Step 5b: explicit trusted copy/paste transfer ----
   const clipboardToken = `CLIP-${randomChars(12, PASSWORD_CHARS)}`;
   ctx.clipboardTransfer = {
     expectedText: clipboardToken,
@@ -1234,7 +1234,7 @@ export function renderHome(root: HTMLElement) {
   const clipboardStatus = el(
     "div",
     { class: "status" },
-    "Step 11 — copy the token from the source field, then paste it into the destination field.",
+    "Step 5b — copy the token from the source field, then paste it into the destination field.",
   );
   const clipboardSource = el("input", {
     type: "text",
@@ -1267,8 +1267,8 @@ export function renderHome(root: HTMLElement) {
       state.value === state.expectedText;
     clipboardStatus.className = state.completed ? "status iframe-task-pass" : "status";
     clipboardStatus.textContent = state.completed
-      ? "Step 11 done — trusted copy and paste matched the token."
-      : "Step 11 — copy the token from the source field, then paste it into the destination field.";
+      ? "Step 5b done — trusted copy and paste matched the token."
+      : "Step 5b — copy the token from the source field, then paste it into the destination field.";
     return state.completed;
   };
   clipboardSource.addEventListener("focus", () => clipboardSource.select());
@@ -1447,7 +1447,7 @@ export function renderHome(root: HTMLElement) {
       el(
         "li",
         {},
-        "Task competence (0–100): share of the 11 tasks completed correctly. Retries and mistakes we can measure (extra Step 2 rounds, wrong Step 3 taps) cost a little credit, never more than 60% of a task.",
+        "Task competence (0–100): share of the 11 tasks (grouped into 5 steps) completed correctly. Retries and mistakes we can measure (extra Step 1b rounds, wrong Step 1c taps) cost a little credit, never more than 60% of a task.",
       ),
       el(
         "li",
@@ -1456,8 +1456,8 @@ export function renderHome(root: HTMLElement) {
       ),
     ),
   );
-  // Related tasks sit together in a card (contiguous steps, numbers unchanged), like Step 2 which
-  // bundles the puzzle with its look-alike widget.
+  // A step is one card holding several related tasks (1a, 1b, 1c, ...). Step 1 bundles the value
+  // slider, the rotation puzzle (with its look-alike widget) and the keypad.
   const taskGroup = (id: string, ...body: (Node | string)[]): HTMLElement => {
     const g = TASK_GROUPS.find((x) => x.id === id);
     if (!g) throw new Error(`unknown task group ${id}`);
@@ -1467,8 +1467,8 @@ export function renderHome(root: HTMLElement) {
       el(
         "div",
         { class: "task-group-head" },
-        el("h3", {}, g.title),
-        el("span", { class: "task-group-steps" }, g.steps),
+        el("h3", {}, `Step ${g.number} — ${g.title}`),
+        el("span", { class: "task-group-steps" }, `${g.tasks} tasks`),
         el("span", { class: "task-group-progress", "data-progress-for": id }, "0 done"),
       ),
       ...body,
@@ -1503,7 +1503,7 @@ export function renderHome(root: HTMLElement) {
     bLabel.textContent =
       c.completed >= c.total
         ? "all tasks done — press Verify to score"
-        : `${c.completed}/${c.total} tasks done — press Verify any time to score`;
+        : `${c.completed}/${c.total} tasks (${c.stepsCompleted}/${c.stepsTotal} steps) done — press Verify any time to score`;
     for (const g of TASK_GROUPS) {
       const mine = c.tasks.filter((t) => t.group === g.id);
       const n = mine.filter((t) => t.completed).length;
@@ -1543,7 +1543,7 @@ export function renderHome(root: HTMLElement) {
     const comp = computeCompetence(ctx);
     cNum.textContent = String(comp.score);
     cCard.className = `vcard meter-${comp.score >= 70 ? "pass" : comp.score >= 40 ? "warn" : "fail"}`;
-    cLabel.textContent = `${comp.score}/100 · ${comp.completed} of ${comp.total} tasks completed`;
+    cLabel.textContent = `${comp.score}/100 · ${comp.completed} of ${comp.total} tasks · ${comp.stepsCompleted} of ${comp.stepsTotal} steps`;
     competenceList.innerHTML = "";
     competenceList.append(el("h3", {}, "Task competence"));
     for (const g of TASK_GROUPS) {
@@ -1552,12 +1552,12 @@ export function renderHome(root: HTMLElement) {
         el(
           "div",
           { class: "competence-group" },
-          el("div", { class: "competence-group-title" }, `${g.title} · ${g.steps}`),
+          el("div", { class: "competence-group-title" }, `Step ${g.number} — ${g.title}`),
           ...mine.map((t) =>
             el(
               "div",
               { class: `competence-task ${t.completed ? "competence-ok" : "competence-miss"}` },
-              `${t.completed ? "✓" : "✗"} Step ${t.step} — ${t.label}${t.note ? ` (${t.note})` : ""}`,
+              `${t.completed ? "✓" : "✗"} ${t.id} — ${t.label}${t.note ? ` (${t.note})` : ""}`,
             ),
           ),
         ),

@@ -16,7 +16,9 @@ export const taskCompetence: Detector = {
       competence: c.score,
       completed: c.completed,
       total: c.total,
-      tasks: c.tasks.map((t) => ({ step: t.step, done: t.completed, credit: +t.credit.toFixed(2) })),
+      stepsCompleted: c.stepsCompleted,
+      stepsTotal: c.stepsTotal,
+      tasks: c.tasks.map((t) => ({ id: t.id, done: t.completed, credit: +t.credit.toFixed(2) })),
     };
     if (c.completed === 0) return result("taskCompetence", "inconclusive", 0, evidence, undefined, "interaction");
     return result("taskCompetence", "pass", 0, evidence, undefined, "interaction");

@@ -54,7 +54,7 @@ export interface DetectorCtx {
 }
 
 /**
- * Step 4 credentials task: unlike a bare "type anything" field, the
+ * Step 2a credentials task: unlike a bare "type anything" field, the
  * username/password must match a specific value generated for this session
  * and shown on screen — otherwise a bot could satisfy the step by pasting or
  * autofilling any fixed string with no relation to the challenge at all.
