@@ -14,7 +14,9 @@ import { nativeSelect } from "../client/src/detectors/interaction/nativeSelect";
 import { popupOpenerIntegrity } from "../client/src/detectors/interaction/popupOpenerIntegrity";
 import { shiftKeyConsistency } from "../client/src/detectors/interaction/shiftKeyConsistency";
 import { puzzleRotate } from "../client/src/detectors/interaction/puzzleRotate";
+import { taskCompetence } from "../client/src/detectors/interaction/taskCompetence";
 import { verifyProbe } from "../client/src/detectors/interaction/verifyProbe";
+import { TASK_GROUPS, computeCompetence } from "../client/src/lib/competence";
 import { sliderDrag } from "../client/src/detectors/interaction/sliderDrag";
 import { clipboardShortcutMismatch, pasteVsType } from "../client/src/detectors/interaction/typing";
 import {
@@ -1119,7 +1121,12 @@ test("verify probe: untouched → inconclusive; slider only → pass; untrusted 
       verifyProbe: {
         ...base,
         slider: {
-          samples: Array.from({ length: 12 }, (_, i) => ({ x: 100 + i * 9, y: 300 + (i % 3), t: i * 30, trusted: true })),
+          samples: Array.from({ length: 12 }, (_, i) => ({
+            x: 100 + i * 9,
+            y: 300 + (i % 3),
+            t: i * 30,
+            trusted: true,
+          })),
           startedAt: 0,
           releasedAt: 400,
         },
@@ -1142,6 +1149,56 @@ test("verify probe: untouched → inconclusive; slider only → pass; untrusted 
   assert.equal(followed.rating, "warn");
   // informational only: it can never move the score
   assert.equal(DETECTOR_WEIGHTS.verifyProbe, 0);
+});
+
+test("task competence: counts completed tasks, small credit loss for retries/mistakes, groups cover all 11 steps", () => {
+  const none = computeCompetence(mkCtx());
+  assert.equal(none.score, 0);
+  assert.equal(none.completed, 0);
+  assert.equal(none.total, 11);
+  assert.equal((taskCompetence.run(mkCtx()) as { rating: string }).rating, "inconclusive");
+
+  // every step belongs to exactly one known group
+  const groups = new Set(TASK_GROUPS.map((g) => g.id));
+  assert.ok(none.tasks.every((t) => groups.has(t.group)));
+  assert.deepEqual(
+    none.tasks.map((t) => t.step),
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  );
+
+  const clean = computeCompetence(
+    mkCtx({
+      slider: { completed: true } as never,
+      credentials: { expectedEmail: "a", expectedPassword: "b", complete: true },
+    }),
+  );
+  assert.equal(clean.completed, 2);
+  assert.equal(clean.score, Math.round(200 / 11));
+
+  // retries and wrong taps cost a little credit, never more than 60 % of a task
+  const messy = computeCompetence(
+    mkCtx({
+      puzzleRotate: {
+        image: "x",
+        initial: 0,
+        angle: 0,
+        samples: [],
+        startedAt: 0,
+        completedAt: 1,
+        holdMs: 1500,
+        attempts: 9,
+        completed: true,
+      },
+      keypad: { pin: [1, 2, 3, 4], clicks: [], completed: true, correct: false, wrongClicks: 2, shuffles: 4 },
+    }),
+  );
+  assert.equal(messy.completed, 2);
+  assert.ok(messy.tasks[1].credit >= 0.4 && messy.tasks[1].credit < 1);
+  assert.equal(messy.tasks[2].credit, 0.7);
+  const res = taskCompetence.run(mkCtx({ slider: { completed: true } as never })) as { rating: string; score: number };
+  assert.equal(res.rating, "pass");
+  assert.equal(res.score, 0); // never a bot signal
+  assert.equal(DETECTOR_WEIGHTS.taskCompetence, 0);
 });
 
 test("idle user (no interaction) → every behavioral detector inconclusive → verdict incomplete", () => {

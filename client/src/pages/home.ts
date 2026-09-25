@@ -2,6 +2,7 @@ import { type TestResult, type Verdict, aggregate } from "../../../shared/types"
 import { interactionDetectors, staticDetectors } from "../detectors";
 import { currentRunner, fetchInspect, submitResults } from "../lib/api";
 import { startCdpMonitor } from "../lib/cdpMonitor";
+import { TASK_GROUPS, computeCompetence } from "../lib/competence";
 import { type DetectorCtx, type KeySample, type MouseSample, runDetectors } from "../lib/detector";
 import { normalizeIframeOrigin, parseHoverShadowMessage, parseIframeInputMessage } from "../lib/iframeChallenge";
 import { PUZZLE_SCENES } from "../lib/puzzleImages";
@@ -32,7 +33,15 @@ export function renderHome(root: HTMLElement) {
     bNum,
     el("div", {}, el("div", { class: "verdict-sub" }, "Behavioral · human motion"), bLabel),
   );
-  const banner = el("div", { class: "verdict-banner" }, sCard, bCard);
+  const cNum = el("div", { class: "verdict-num" }, "—");
+  const cLabel = el("div", { class: "verdict-tag" }, "how well the tasks were done");
+  const cCard = el(
+    "div",
+    { class: "vcard" },
+    cNum,
+    el("div", {}, el("div", { class: "verdict-sub" }, "Task competence"), cLabel),
+  );
+  const banner = el("div", { class: "verdict-banner" }, sCard, bCard, cCard);
 
   function setStatic() {
     const { botScore, verdict } = aggregate([...staticMap.values()]);
@@ -1420,35 +1429,65 @@ export function renderHome(root: HTMLElement) {
   const interStatus = el(
     "div",
     { class: "status" },
-    "Challenge: complete all eleven steps, then press Verify. We score motion, timing, trusted keyboard and clipboard delivery, controlled iframe state, and invisible honeypot access.",
+    "Do as many tasks as you can, then press Verify — you do not have to finish them all. The bot score judges the motion, timing, trusted input and honeypot access of what you did; task competence judges how many tasks you completed correctly.",
   );
+  const competenceList = el("div", { class: "competence-list" });
+  const scoringHelp = el(
+    "details",
+    { class: "scoring-help" },
+    el("summary", {}, "How scoring works"),
+    el(
+      "ul",
+      {},
+      el(
+        "li",
+        {},
+        "Bot score (0–100, lower is more human): combines the passive checks with the behavior signals of the tasks you actually did. A task you skipped adds nothing and is never held against you.",
+      ),
+      el(
+        "li",
+        {},
+        "Task competence (0–100): share of the 11 tasks completed correctly. Retries and mistakes we can measure (extra Step 2 rounds, wrong Step 3 taps) cost a little credit, never more than 60% of a task.",
+      ),
+      el(
+        "li",
+        {},
+        "You can press Verify at any time. The two scores are independent: a fast, correct run can still read as a bot, and a human can score low on competence by skipping tasks.",
+      ),
+    ),
+  );
+  // Related tasks sit together in a card (contiguous steps, numbers unchanged), like Step 2 which
+  // bundles the puzzle with its look-alike widget.
+  const taskGroup = (id: string, ...body: (Node | string)[]): HTMLElement => {
+    const g = TASK_GROUPS.find((x) => x.id === id);
+    if (!g) throw new Error(`unknown task group ${id}`);
+    return el(
+      "div",
+      { class: "task-group", "data-group": id },
+      el(
+        "div",
+        { class: "task-group-head" },
+        el("h3", {}, g.title),
+        el("span", { class: "task-group-steps" }, g.steps),
+        el("span", { class: "task-group-progress", "data-progress-for": id }, "0 done"),
+      ),
+      ...body,
+    );
+  };
   root.append(
     section(
       "② Active challenge (the decisive one)",
-      "Complete the task — we judge how it's done, not whether it's done",
-      sliderStatus,
-      sliderRow,
-      pzStatus,
-      pzBox,
-      vfBox,
-      keypadStatus,
-      keypadPinRow,
-      keypadOpenBtn,
-      credentialsStatus,
-      form,
-      iframeTask,
-      bonusClickStatus,
-      bonusClickRow,
-      popupStatus,
-      popupLink,
-      inPageHoverTask,
-      hoverMenuTask,
-      nativeSelectStatus,
-      nativeSelectTask,
-      clipboardTask,
+      "Do what you can — we judge how it's done, and how well",
+      scoringHelp,
+      taskGroup("pointer", sliderStatus, sliderRow, pzStatus, pzBox, vfBox, keypadStatus, keypadPinRow, keypadOpenBtn),
+      taskGroup("input", credentialsStatus, form, iframeTask),
+      taskGroup("click", bonusClickStatus, bonusClickRow, popupStatus, popupLink),
+      taskGroup("hover", inPageHoverTask, hoverMenuTask),
+      taskGroup("select", nativeSelectStatus, nativeSelectTask, clipboardTask),
       submit,
       interStatus,
       interList,
+      competenceList,
     ),
   );
   // the popup itself renders as an overlay above everything, independent of
@@ -1457,34 +1496,29 @@ export function renderHome(root: HTMLElement) {
 
   // live: show CHALLENGE PROGRESS, not a score. A behavioral verdict before the
   // task is finished is confusing — the number only appears once you press Verify.
-  const REQUIRED_STEPS = 11;
   const liveTimer = window.setInterval(() => {
-    const done =
-      (ctx.slider?.completed ? 1 : 0) +
-      (ctx.puzzleRotate?.completed ? 1 : 0) +
-      (ctx.keypad?.completed ? 1 : 0) +
-      (ctx.credentials?.complete ? 1 : 0) +
-      (ctx.iframeInput?.complete && ctx.iframeInput.blurred ? 1 : 0) +
-      (ctx.detachedClick?.completed ? 1 : 0) +
-      (ctx.popupCheck?.completed ? 1 : 0) +
-      (ctx.hoverMenu?.completed ? 1 : 0) +
-      (ctx.inPageHoverMenu?.completed ? 1 : 0) +
-      (ctx.nativeSelect?.complete ? 1 : 0) +
-      (ctx.clipboardTransfer?.completed ? 1 : 0);
+    const c = computeCompetence(ctx);
     bNum.textContent = "—";
     bCard.className = "vcard";
     bLabel.textContent =
-      done >= REQUIRED_STEPS
-        ? "all steps done — press Verify to score"
-        : `complete the challenge · ${done}/${REQUIRED_STEPS} steps`;
+      c.completed >= c.total
+        ? "all tasks done — press Verify to score"
+        : `${c.completed}/${c.total} tasks done — press Verify any time to score`;
+    for (const g of TASK_GROUPS) {
+      const mine = c.tasks.filter((t) => t.group === g.id);
+      const n = mine.filter((t) => t.completed).length;
+      const badge = root.querySelector(`[data-progress-for="${g.id}"]`);
+      if (badge) {
+        badge.textContent = `${n}/${mine.length} done`;
+        badge.classList.toggle("task-group-done", n === mine.length);
+      }
+    }
   }, 400);
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (!onCredentialsInput()) {
-      credentialsStatus.textContent = `Step 4 incomplete — enter ${expectedEmail} / ${expectedPassword} exactly before verifying.`;
-      return;
-    }
+    // Verify works at any point: unfinished tasks are simply not scored (and not held against you).
+    onCredentialsInput();
     updateClipboardState();
     ctx.submittedAt = Date.now();
     // catch bots that set the hidden field's value without firing an input event
@@ -1506,6 +1540,29 @@ export function renderHome(root: HTMLElement) {
     interStatus.textContent = "Analyzing behavior…";
     const results = await runDetectors(interactionDetectors, ctx, (r) => interList.append(resultRow(r)));
     const v: Verdict = setBehavioral(results);
+    const comp = computeCompetence(ctx);
+    cNum.textContent = String(comp.score);
+    cCard.className = `vcard meter-${comp.score >= 70 ? "pass" : comp.score >= 40 ? "warn" : "fail"}`;
+    cLabel.textContent = `${comp.score}/100 · ${comp.completed} of ${comp.total} tasks completed`;
+    competenceList.innerHTML = "";
+    competenceList.append(el("h3", {}, "Task competence"));
+    for (const g of TASK_GROUPS) {
+      const mine = comp.tasks.filter((t) => t.group === g.id);
+      competenceList.append(
+        el(
+          "div",
+          { class: "competence-group" },
+          el("div", { class: "competence-group-title" }, `${g.title} · ${g.steps}`),
+          ...mine.map((t) =>
+            el(
+              "div",
+              { class: `competence-task ${t.completed ? "competence-ok" : "competence-miss"}` },
+              `${t.completed ? "✓" : "✗"} Step ${t.step} — ${t.label}${t.note ? ` (${t.note})` : ""}`,
+            ),
+          ),
+        ),
+      );
+    }
     interStatus.textContent =
       v === "fail"
         ? "Behavioral test done — classified as BOT"

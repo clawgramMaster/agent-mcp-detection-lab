@@ -198,6 +198,7 @@ export const DETECTOR_WEIGHTS: Record<string, number> = {
   webrtcLeak: 0,
   batteryApi: 0,
   cdpConsoleTiming: 0, // human-opened DevTools activates the same serialization path
+  taskCompetence: 0, // how well the tasks were performed; separate from the bot score
   verifyProbe: 0, // decoy slider + accessibility-only text; screen-reader users can follow it too
 };
 

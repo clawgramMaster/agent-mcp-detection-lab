@@ -17,6 +17,7 @@ import { popupOpenerIntegrity } from "./interaction/popupOpenerIntegrity";
 import { scrollDynamics } from "./interaction/scrollDynamics";
 import { shiftKeyConsistency } from "./interaction/shiftKeyConsistency";
 import { puzzleRotate } from "./interaction/puzzleRotate";
+import { taskCompetence } from "./interaction/taskCompetence";
 import { verifyProbe } from "./interaction/verifyProbe";
 import { sliderDrag } from "./interaction/sliderDrag";
 import { clipboardShortcutMismatch, pasteVsType, typingCadence } from "./interaction/typing";
@@ -98,6 +99,7 @@ export const interactionDetectors: Detector[] = [
   honeypot, // hidden-button click is decisive; hidden-field autofill only warns
   sliderDrag, // drag kinematics to a target
   puzzleRotate, // wheel-path kinematics rotating a circular cut-out upright
+  taskCompetence, // how many tasks were completed correctly (informational)
   verifyProbe, // decoy CAPTCHA look-alike: does a session touch it / follow its accessibility-only text
   keypadChallenge, // click-to-enter PIN on a re-shuffled closed-shadow-root keypad
   iframeControlledInput, // trusted typing through a nested controlled iframe

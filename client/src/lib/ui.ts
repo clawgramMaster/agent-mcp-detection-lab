@@ -12,7 +12,8 @@ export function el(tag: string, attrs: Record<string, string> = {}, ...children:
 }
 
 export function ratingBadge(r: Rating): HTMLElement {
-  const label = r === "pass" ? "PASS" : r === "warn" ? "WARN" : "FAIL";
+  // "inconclusive" = not scored (task skipped or not enough data); it must not read as a failure
+  const label = r === "pass" ? "PASS" : r === "warn" ? "WARN" : r === "inconclusive" ? "NOT SCORED" : "FAIL";
   return el("span", { class: `badge badge-${r}` }, label);
 }
 
@@ -37,7 +38,7 @@ export function resultRow(r: TestResult): HTMLElement {
     { class: "result-head" },
     el("span", { class: "result-name" }, r.label || r.test),
     ratingBadge(r.rating),
-    el("span", { class: "result-score" }, `score ${r.score}`),
+    el("span", { class: "result-score" }, r.rating === "inconclusive" ? "not scored" : `score ${r.score}`),
   );
   const ev = el("pre", { class: "result-evidence" }, JSON.stringify(r.evidence, null, 2));
   const toggle = el("button", { class: "evidence-toggle" }, "evidence");
