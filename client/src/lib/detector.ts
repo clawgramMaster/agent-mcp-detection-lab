@@ -230,6 +230,10 @@ export interface VerifyProbeState {
   /** the piece sat in the gap when the countdown ended */
   passed: boolean;
   passedAt: number;
+  /** the slider was ever dragged; kept across rerolls, which reset the per-round samples */
+  touched: boolean;
+  /** untrusted slider events over all rounds */
+  untrustedSamples: number;
 }
 
 export interface PuzzleRotateState {

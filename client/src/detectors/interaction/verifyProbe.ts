@@ -20,16 +20,22 @@ export const verifyProbe: Detector = {
     const s = ctx.verifyProbe;
     const slid = s?.slider.samples.length ?? 0;
     const fallback = s?.fallbackClicks ?? [];
-    if (!s || (slid === 0 && fallback.length === 0)) {
+    // a failed round resets the per-round samples, so also count the persistent flags
+    const touched = slid > 0 || fallback.length > 0 || !!s?.touched || (s?.attempts ?? 1) > 1;
+    if (!s || !touched) {
       // not touching a decoy proves nothing either way
       return result("verifyProbe", "inconclusive", 0, { touched: false }, undefined, "interaction");
     }
 
-    const untrustedSlide = s.slider.samples.filter((p) => !p.trusted).length;
+    const untrustedSlide = Math.max(s.slider.samples.filter((p) => !p.trusted).length, s.untrustedSamples ?? 0);
+    // never released (or reset by a reroll): measure to the last sample instead of a bogus negative
+    const last = s.slider.samples[slid - 1];
+    const endedAt = s.slider.releasedAt > s.slider.startedAt ? s.slider.releasedAt : (last?.t ?? s.slider.startedAt);
     const ev: Record<string, unknown> = {
       sliderSamples: slid,
       sliderUntrusted: untrustedSlide,
-      sliderMs: slid > 0 ? Math.round(s.slider.releasedAt - s.slider.startedAt) : 0,
+      sliderMs: slid > 0 ? Math.max(0, Math.round(endedAt - s.slider.startedAt)) : 0,
+      touched: true,
       fallbackClicks: fallback.length,
       attempts: s.attempts,
       passed: s.passed,

@@ -1121,6 +1121,8 @@ test("verify probe: untouched → inconclusive; slider only → pass; untrusted 
     attempts: 1,
     passed: false,
     passedAt: 0,
+    touched: false,
+    untrustedSamples: 0,
   };
   assert.equal((verifyProbe.run(mkCtx()) as { rating: string }).rating, "inconclusive");
   assert.equal((verifyProbe.run(mkCtx({ verifyProbe: base })) as { rating: string }).rating, "inconclusive");
@@ -1178,6 +1180,37 @@ test("verify probe: untouched → inconclusive; slider only → pass; untrusted 
     mkCtx({ verifyProbe: { ...base, fallbackClicks: [{ t: 900, trusted: true, via: "keyboard-or-script" }] } }),
   ) as { rating: string; evidence?: Record<string, unknown> };
   assert.equal(followed.rating, "warn");
+  // a failed round resets the per-round samples: the earlier attempt must still count as touched
+  const retried = verifyProbe.run(mkCtx({ verifyProbe: { ...base, attempts: 3 } })) as {
+    rating: string;
+    evidence?: Record<string, unknown>;
+  };
+  assert.notEqual(retried.rating, "inconclusive");
+  assert.equal(retried.evidence?.attempts, 3);
+  const touchedThenReset = verifyProbe.run(mkCtx({ verifyProbe: { ...base, touched: true } })) as { rating: string };
+  assert.equal(touchedThenReset.rating, "pass");
+  // untrusted input from a failed round is not lost when the samples are reset
+  const syntheticThenReset = verifyProbe.run(
+    mkCtx({ verifyProbe: { ...base, attempts: 2, touched: true, untrustedSamples: 4 } }),
+  ) as { rating: string };
+  assert.equal(syntheticThenReset.rating, "warn");
+  // never released (releasedAt still 0): the duration must not go negative
+  const held = verifyProbe.run(
+    mkCtx({
+      verifyProbe: {
+        ...base,
+        slider: {
+          samples: [
+            { x: 100, y: 300, t: 5100, trusted: true },
+            { x: 130, y: 301, t: 5400, trusted: true },
+          ],
+          startedAt: 5000,
+          releasedAt: 0,
+        },
+      },
+    }),
+  ) as { evidence?: Record<string, unknown> };
+  assert.equal(held.evidence?.sliderMs, 400);
   // informational only: it can never move the score
   assert.equal(DETECTOR_WEIGHTS.verifyProbe, 0);
 });

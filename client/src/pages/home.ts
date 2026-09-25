@@ -507,8 +507,8 @@ export function renderHome(root: HTMLElement) {
     pzStatus.textContent =
       "Step 1b — the circle was not upright, so the picture changed. Slide the bar to turn the new circle upright, then stop.";
   };
-  // The bar is the main control: handle position (0..PZ_TRAVEL px) maps linearly onto one
-  // full turn (0..360°) added to the initial angle. The wheel over the picture just nudges the
+  // The bar is the main control: the handle position (0..PZ_TRAVEL px) goes through a hidden
+  // per-round non-linear warp (pzTurns) and the result is added to the initial angle. The wheel over the picture just nudges the
   // same bar, so both inputs share one state.
   const pzSetHandle = (x: number, src: "bar" | "wheel", trusted: boolean, px: number, py: number) => {
     const s = ctx.puzzleRotate;
@@ -1358,6 +1358,8 @@ export function renderHome(root: HTMLElement) {
     attempts: 1,
     passed: false,
     passedAt: 0,
+    touched: false,
+    untrustedSamples: 0,
   };
   const VF_W = 360; // same width as the rotation puzzle above
   const VF_H = 160;
@@ -1459,6 +1461,10 @@ export function renderHome(root: HTMLElement) {
   const vfAligned = () => Math.abs(vfPieceX() - vfGapX) <= VF_TOL;
   let vfStopTimer = 0;
   let vfHoldTimer = 0;
+  let vfRerollTimer = 0;
+  // While the "failed" message shows, the widget ignores the handle so a nudge cannot start a
+  // countdown that would outlive the reroll.
+  let vfLocked = false;
   let vfDragging = false;
   let vfGrabDx = 0;
   const vfCancelHold = () => {
@@ -1472,6 +1478,10 @@ export function renderHome(root: HTMLElement) {
   // start position, and restarts the telemetry — same as the rotation puzzle.
   const vfReroll = () => {
     const probe = ctx.verifyProbe;
+    window.clearTimeout(vfRerollTimer);
+    vfRerollTimer = 0;
+    vfCancelHold();
+    vfLocked = false;
     if (!probe || probe.passed) return;
     const others = PUZZLE_SCENES.filter((x) => x.file !== vfScene.file);
     vfScene = others[randomInt(others.length)];
@@ -1498,13 +1508,15 @@ export function renderHome(root: HTMLElement) {
         vfBox.classList.add("vf-ok");
         vfCountdown.done("Verification passed");
       } else {
+        vfLocked = true;
+        vfDragging = false;
         vfCountdown.stop("Verification failed, please try again");
-        window.setTimeout(vfReroll, 900);
+        vfRerollTimer = window.setTimeout(vfReroll, 900);
       }
     }, PZ_HOLD_MS);
   };
   vfHandle.addEventListener("pointerdown", (e) => {
-    if (ctx.verifyProbe?.passed) return;
+    if (ctx.verifyProbe?.passed || vfLocked) return;
     vfDragging = true;
     vfGrabDx = e.clientX - vfHandle.getBoundingClientRect().left;
     vfHandle.setPointerCapture(e.pointerId);
@@ -1513,10 +1525,16 @@ export function renderHome(root: HTMLElement) {
     e.preventDefault();
   });
   vfHandle.addEventListener("pointermove", (e) => {
-    if (!vfDragging || ctx.verifyProbe?.passed) return;
+    if (!vfDragging || vfLocked || ctx.verifyProbe?.passed) return;
     const x = Math.max(0, Math.min(VF_TRAVEL, e.clientX - vfBar.getBoundingClientRect().left - vfGrabDx));
     vfMove(x);
-    ctx.verifyProbe?.slider.samples.push({ x: e.clientX, y: e.clientY, t: performance.now(), trusted: e.isTrusted });
+    const probe = ctx.verifyProbe;
+    probe?.slider.samples.push({ x: e.clientX, y: e.clientY, t: performance.now(), trusted: e.isTrusted });
+    if (probe) {
+      // survives rerolls, which reset the per-round samples
+      probe.touched = true;
+      if (!e.isTrusted) probe.untrustedSamples += 1;
+    }
     // moving resets the countdown; it (re)starts once the handle has been still for PZ_STOP_MS
     vfCancelHold();
     vfStopTimer = window.setTimeout(vfStartCountdown, PZ_STOP_MS);

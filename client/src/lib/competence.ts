@@ -6,7 +6,7 @@ import type { DetectorCtx } from "./detector";
  *  - every task is worth the same (11 tasks, grouped into 5 steps);
  *  - a task counts only when it is completed correctly (unfinished or unattempted = 0);
  *  - a completed task can lose a little credit for retries or mistakes when we can measure them
- *    (Step 2: extra rounds, Step 3: wrong taps), never below 40 % of its value.
+ *    (Step 1b: extra rounds, Step 1c: wrong taps), never below 40 % of its value.
  * Tasks nobody attempted are neutral for the bot score but count as not done here.
  */
 export interface TaskGroup {
