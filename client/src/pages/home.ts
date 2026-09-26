@@ -342,31 +342,30 @@ export function renderHome(root: HTMLElement) {
   let pzScene = PUZZLE_SCENES[randomInt(PUZZLE_SCENES.length)];
   let [pzCx, pzCy] = pzScene.spots[randomInt(pzScene.spots.length)];
   let pzInitial = 0; // angle at bar position 0 (dealt per round, see pzDeal)
-  let pzKnots: number[] = [0]; // hidden bar->turns warp (dealt per round)
+  let pzKnots: number[] = [0]; // bar->turns knots (linear; slope dealt per round)
   let pzHandleX = 0;
   let pzAttempts = 1;
   const normDeg = (d: number) => {
     const m = ((d % 360) + 360) % 360;
     return m > 180 ? m - 360 : m;
   };
-  // Bar position -> rotation is deliberately NOT linear and not derivable from one snapshot.
-  // Each round deals a random smooth warp u(p) (turns) through 5 segments: it speeds up, slows
-  // down and can even turn back, so the same bar distance rotates the circle by different amounts
-  // in different places. The warp lives only in this closure (never in the DOM). The solved
-  // position p* is chosen first and the start angle derived from it, so a solution always exists.
+  // Bar position -> rotation is LINEAR: turns(p) = slope * p, where the per-round slope (total
+  // turns across the full bar travel) is dealt at random. The same bar distance always rotates
+  // the circle by the same amount. The solved position p* is chosen first and the start angle
+  // derived from it, so a solution always exists.
   const pzRand = () => randomInt(1_000_000) / 1_000_000;
   const pzTurns = (p: number) => {
     const c = Math.max(0, Math.min(1, p));
     const seg = Math.min(pzKnots.length - 2, Math.floor(c * (pzKnots.length - 1)));
     const t = c * (pzKnots.length - 1) - seg;
-    const smooth = t * t * (3 - 2 * t);
-    return pzKnots[seg] + (pzKnots[seg + 1] - pzKnots[seg]) * smooth;
+    return pzKnots[seg] + (pzKnots[seg + 1] - pzKnots[seg]) * t; // linear interpolation
   };
   const pzAngleAt = (x: number) => normDeg(pzInitial + 360 * pzTurns(x / PZ_TRAVEL));
   const pzDeal = () => {
     for (;;) {
+      const slope = 0.5 + pzRand() * 0.7; // total turns over the bar travel (0.5..1.2)
       const knots = [0];
-      for (let i = 1; i <= 5; i++) knots.push(knots[i - 1] + (pzRand() * 2 - 1) * 0.26);
+      for (let i = 1; i <= 5; i++) knots.push((slope * i) / 5);
       pzKnots = knots;
       const target = 0.25 + pzRand() * 0.65; // where the solved position will sit
       const eps = 0.003;
@@ -525,7 +524,7 @@ export function renderHome(root: HTMLElement) {
     onReroll: pzReroll,
   });
   // The bar is the main control: the handle position (0..PZ_TRAVEL px) goes through a hidden
-  // per-round non-linear warp (pzTurns) and the result is added to the initial angle. The wheel
+  // per-round linear mapping (pzTurns) and the result is added to the initial angle. The wheel
   // over the picture just nudges the same bar, so both inputs share one state.
   const pzSetHandle = (x: number, src: "bar" | "wheel", trusted: boolean, px: number, py: number) => {
     const s = ctx.puzzleRotate;
